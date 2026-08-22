@@ -23,6 +23,7 @@ class UserResponse(BaseModel):
     name: str
     email: EmailStr
     role: str
+    is_active: bool
 
     class Config:
         from_attributes = True
@@ -49,3 +50,9 @@ class VendorResponse(BaseModel):
 
 class UserProfileUpdate(BaseModel):
     name: str | None = None
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+    confirm_password: str

@@ -3,44 +3,126 @@
 import {
   createContext,
   useContext,
+  useEffect,
   useState,
   type ReactNode,
 } from "react";
 
-interface User {
-  id: string;
+export type UserRole = "admin" | "vendor" | "customer";
+
+export interface User {
+  id: number;
   name: string;
   email: string;
-  role: "customer" | "vendor" | "admin";
+  role: UserRole;
+  is_active: boolean;
 }
 
 interface AuthContextType {
   user: User | null;
+  token: string | null;
   isAuthenticated: boolean;
-  login: (user: User) => void;
+  isLoading: boolean;
+  login: (user: User, token: string) => void;
   logout: () => void;
+  refreshUser: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType | undefined>(
+  undefined,
+);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
+const TOKEN_KEY = "access_token";
+const USER_KEY = "vendora_user";
+
+export function AuthProvider({
+  children,
+}: {
+  children: ReactNode;
+}) {
   const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const login = (user: User) => {
-    setUser(user);
-  };
+  useEffect(() => {
+    try {
+      const savedToken = localStorage.getItem(TOKEN_KEY);
+      const savedUser = localStorage.getItem(USER_KEY);
 
-  const logout = () => {
+      if (savedToken) {
+        setToken(savedToken);
+      }
+
+      if (savedUser) {
+        try {
+          setUser(JSON.parse(savedUser) as User);
+        } catch {
+          localStorage.removeItem(USER_KEY);
+        }
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  function login(newUser: User, newToken: string) {
+    localStorage.setItem(TOKEN_KEY, newToken);
+    localStorage.setItem(USER_KEY, JSON.stringify(newUser));
+
+    setToken(newToken);
+    setUser(newUser);
+  }
+
+  async function refreshUser() {
+    const currentToken =
+      token || localStorage.getItem(TOKEN_KEY);
+
+    if (!currentToken) {
+      return;
+    }
+
+    const response = await fetch(`${API_URL}/users/me`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${currentToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to refresh user");
+    }
+
+    const updatedUser = (await response.json()) as User;
+
+    setUser(updatedUser);
+
+    localStorage.setItem(
+      USER_KEY,
+      JSON.stringify(updatedUser),
+    );
+  }
+
+  function logout() {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+
+    setToken(null);
     setUser(null);
-  };
+  }
 
   return (
     <AuthContext.Provider
       value={{
         user,
-        isAuthenticated: !!user,
+        token,
+        isAuthenticated: !!token && !!user,
+        isLoading,
         login,
         logout,
+        refreshUser,
       }}
     >
       {children}
@@ -52,7 +134,9 @@ export function useAuth() {
   const context = useContext(AuthContext);
 
   if (!context) {
-    throw new Error("useAuth must be used inside AuthProvider");
+    throw new Error(
+      "useAuth must be used inside AuthProvider",
+    );
   }
 
   return context;

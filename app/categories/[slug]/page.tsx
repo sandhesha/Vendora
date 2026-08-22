@@ -1,124 +1,165 @@
 "use client";
 
-import { motion } from "framer-motion";
-import {
-  ArrowRight,
-  Grid3X3,
-  Sparkles,
-} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowLeft, Loader2, Package, Search } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import {
-  getCategories,
-  type Category,
-} from "@/lib/api/categories";
-import {
-  getProducts,
-  type Product as ApiProduct,
-} from "@/lib/api/products";
+import { useParams } from "next/navigation";
 
-export default function CategoryPage({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}) {
-  const [loading, setLoading] = useState(true);
-const [error, setError] = useState("");
-  const [slug, setSlug] = useState("shoes");
-  const [liked, setLiked] = useState<number[]>([]);
+interface Category {
+  id: number;
+  name: string;
+  description?: string | null;
+  is_active: boolean;
+}
 
-  const [apiProducts, setApiProducts] = useState<ApiProduct[]>([]);
-  const [apiCategories, setApiCategories] = useState<Category[]>([]);
-  const [productsLoading, setProductsLoading] = useState(true);
+interface Subcategory {
+  id: number;
+  category_id: number;
+  name: string;
+  description?: string | null;
+  is_active: boolean;
+}
 
-useEffect(() => {
-  params.then(({ slug }) => {
-    setSlug(slug.toLowerCase());
-  });
-}, [params]);
+interface Product {
+  id: number;
+  name: string;
+  description?: string | null;
+  price?: number;
+  category_id: number;
+  subcategory_id?: number | null;
+  category_name?: string | null;
+}
 
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://127.0.0.1:8000";
 
-  useEffect(() => {
-    let mounted = true;
+function slugify(value: string) {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
 
-    async function loadSlug() {
-      const { slug: routeSlug } = await params;
+export default function CategoryDetailPage() {
+  const params = useParams();
 
-      if (mounted) {
-        setSlug(routeSlug);
-      }
-    }
+  const slug = Array.isArray(params.slug)
+    ? params.slug[0]
+    : String(params.slug ?? "");
 
-    loadSlug();
+  const [category, setCategory] =
+    useState<Category | null>(null);
 
-    return () => {
-      mounted = false;
-    };
-  }, [params]);
+  const [subcategories, setSubcategories] =
+    useState<Subcategory[]>([]);
 
-  // your existing product/category useEffect continues here...
+  const [products, setProducts] =
+    useState<Product[]>([]);
 
+  const [search, setSearch] = useState("");
 
+  const [loading, setLoading] =
+    useState(true);
 
-const currentCategory = apiCategories.find(
-  (item) =>
-    item.name.toLowerCase().replace(/\s+/g, "-") ===
-    slug.toLowerCase(),
-);
-
-const categoryProducts = apiProducts.filter(
-  (product) =>
-    currentCategory &&
-    product.category_id === currentCategory.id,
-);
-
-
-useEffect(() => {
-  let mounted = true;
-
-  async function loadProducts() {
-    try {
-      setProductsLoading(true);
-
-      const data = await getProducts();
-
-      if (mounted) {
-        setApiProducts(data);
-      }
-    } catch (error) {
-      console.error("Failed to load category products:", error);
-    } finally {
-      if (mounted) {
-        setProductsLoading(false);
-      }
-    }
-  }
-
-  loadProducts();
-
-  return () => {
-    mounted = false;
-  };
-}, []);
+  const [error, setError] = useState("");
 
   useEffect(() => {
+    if (!slug) return;
+
     let mounted = true;
 
-    async function loadCategories() {
+    async function loadCategory() {
       try {
         setLoading(true);
         setError("");
 
-        const data = await getCategories();
+        const [
+          categoryResponse,
+          subcategoryResponse,
+          productResponse,
+        ] = await Promise.all([
+          fetch(`${API_URL}/categories`, {
+            headers: {
+              Accept: "application/json",
+            },
+          }),
+          fetch(`${API_URL}/subcategories`, {
+            headers: {
+              Accept: "application/json",
+            },
+          }),
+          fetch(`${API_URL}/products`, {
+            headers: {
+              Accept: "application/json",
+            },
+          }),
+        ]);
+
+        if (!categoryResponse.ok) {
+          throw new Error(
+            `Categories request failed: ${categoryResponse.status}`,
+          );
+        }
+
+        const categories =
+          (await categoryResponse.json()) as Category[];
+
+        const allSubcategories =
+          subcategoryResponse.ok
+            ? ((await subcategoryResponse.json()) as Subcategory[])
+            : [];
+
+        const allProducts =
+          productResponse.ok
+            ? ((await productResponse.json()) as Product[])
+            : [];
+
+        const foundCategory =
+          categories.find(
+            (item) =>
+              slugify(item.name) ===
+              slug,
+          ) ?? null;
+
+        if (!foundCategory) {
+          throw new Error(
+            "Category not found.",
+          );
+        }
 
         if (mounted) {
-          setApiCategories(data.filter((category) => category.is_active));
+          setCategory(foundCategory);
+
+          setSubcategories(
+            allSubcategories.filter(
+              (item) =>
+                item.category_id ===
+                foundCategory.id,
+            ),
+          );
+
+          setProducts(
+            allProducts.filter(
+              (item) =>
+                item.category_id ===
+                foundCategory.id,
+            ),
+          );
         }
       } catch (err) {
-        console.error("Failed to load categories:", err);
+        console.error(
+          "Failed to load category:",
+          err,
+        );
 
         if (mounted) {
-          setError("Failed to load categories.");
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Failed to load category.",
+          );
         }
       } finally {
         if (mounted) {
@@ -127,155 +168,220 @@ useEffect(() => {
       }
     }
 
-    loadCategories();
+    loadCategory();
 
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [slug]);
 
-  return (
-    <main className="min-h-screen bg-black px-5 pb-28 pt-28 text-white md:px-8">
-      <div className="mx-auto max-w-7xl">
+  const filteredProducts = useMemo(() => {
+    const query = search
+      .trim()
+      .toLowerCase();
 
-        {/* HEADER */}
+    if (!query) {
+      return products;
+    }
 
-        <div className="mb-12">
-          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.35em] text-white/30">
-            <Sparkles size={13} />
-            Explore Vendora
+    return products.filter((product) =>
+      product.name
+        .toLowerCase()
+        .includes(query),
+    );
+  }, [products, search]);
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-slate-950 px-4 pt-32 text-white">
+        <div className="flex min-h-64 items-center justify-center">
+          <div className="flex items-center gap-3 text-sm text-white/50">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            Loading category...
           </div>
-
-          <h1 className="mt-5 text-5xl font-black tracking-tight md:text-7xl">
-            Categories
-          </h1>
-
-          <p className="mt-5 max-w-xl text-sm leading-7 text-white/35">
-            Explore products across our marketplace and discover
-            something made for you.
-          </p>
         </div>
+      </main>
+    );
+  }
 
-        {/* LOADING */}
+  if (error || !category) {
+    return (
+      <main className="min-h-screen bg-slate-950 px-4 pt-32 text-white">
+        <div className="mx-auto max-w-3xl">
+          <Link
+            href="/categories"
+            className="mb-6 inline-flex items-center gap-2 text-sm text-white/60 hover:text-white"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Categories
+          </Link>
 
-        {loading && (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, index) => (
-              <div
-                key={index}
-                className="h-64 animate-pulse rounded-[2rem] border border-white/10 bg-white/[0.03]"
-              />
-            ))}
-          </div>
-        )}
+          <div className="rounded-3xl border border-red-500/20 bg-red-500/10 p-8">
+            <h1 className="text-xl font-semibold">
+              Category not found
+            </h1>
 
-        {/* ERROR */}
-
-        {!loading && error && (
-          <div className="rounded-[2rem] border border-red-500/20 bg-red-500/5 p-8 text-center">
-            <p className="text-sm text-red-300">{error}</p>
-
-            <button
-              onClick={() => window.location.reload()}
-              className="mt-5 rounded-xl bg-white px-5 py-3 text-xs font-bold text-black"
-            >
-              Try again
-            </button>
-          </div>
-        )}
-
-        {/* EMPTY */}
-
-        {!loading && !error && apiCategories.length === 0 && (
-          <div className="rounded-[2rem] border border-white/10 bg-white/[0.025] p-12 text-center">
-            <Grid3X3
-              size={32}
-              className="mx-auto text-white/20"
-            />
-
-            <h2 className="mt-5 text-xl font-bold">
-              No categories yet
-            </h2>
-
-            <p className="mt-2 text-sm text-white/30">
-              Categories will appear here once they are added.
+            <p className="mt-2 text-sm text-white/50">
+              {error ||
+                "This category does not exist."}
             </p>
           </div>
-        )}
+        </div>
+      </main>
+    );
+  }
 
-        {/* CATEGORY GRID */}
+  return (
+    <main className="min-h-screen bg-slate-950 px-4 pb-16 pt-28 text-white md:px-8">
+      <div className="mx-auto max-w-7xl">
+        {/* Back */}
+        <Link
+          href="/categories"
+          className="mb-8 inline-flex items-center gap-2 text-sm text-white/50 transition hover:text-white"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          All Categories
+        </Link>
 
-        {!loading && !error && apiCategories.length > 0 && (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {apiCategories.map((category, index) => (
-              <motion.div
-                key={category.id}
-                initial={{
-                  opacity: 0,
-                  y: 25,
-                }}
-                animate={{
-                  opacity: 1,
-                  y: 0,
-                }}
-                transition={{
-                  delay: index * 0.08,
-                }}
-                whileHover={{
-                  y: -8,
-                }}
-              >
-                <Link
-                  href={`/categories/${category.name
-                    .toLowerCase()
-                    .replace(/\s+/g, "-")}`}
-                  className="group relative block min-h-64 overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.025] p-7 transition hover:border-white/20"
-                >
-                  {/* NUMBER */}
+        {/* Category header */}
+        <section className="mb-10 rounded-3xl border border-white/10 bg-white/[0.04] p-6 md:p-10">
+          <p className="text-xs font-medium uppercase tracking-[0.2em] text-white/30">
+            Category
+          </p>
 
-                  <div className="absolute right-6 top-6 text-[10px] text-white/20">
-                    {String(index + 1).padStart(2, "0")}
-                  </div>
+          <h1 className="mt-3 text-3xl font-bold md:text-5xl">
+            {category.name}
+          </h1>
 
-                  {/* ICON */}
+          <p className="mt-4 max-w-2xl text-sm leading-7 text-white/50 md:text-base">
+            {category.description ||
+              `Explore products available in ${category.name}.`}
+          </p>
 
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05]">
-                    <Grid3X3
-                      size={22}
-                      className="text-white/60"
-                    />
-                  </div>
+          <div className="mt-6 flex flex-wrap gap-3 text-sm text-white/50">
+            <span className="rounded-xl bg-white/5 px-4 py-2">
+              {products.length} Products
+            </span>
 
-                  {/* CONTENT */}
-
-                  <div className="absolute bottom-7 left-7 right-7">
-                    <h2 className="text-2xl font-bold">
-                      {category.name}
-                    </h2>
-
-                    {category.description && (
-                      <p className="mt-2 line-clamp-2 text-xs leading-6 text-white/30">
-                        {category.description}
-                      </p>
-                    )}
-
-                    <div className="mt-5 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-white/40 transition group-hover:text-white">
-                      Explore
-                      <ArrowRight
-                        size={13}
-                        className="transition group-hover:translate-x-1"
-                      />
-                    </div>
-                  </div>
-
-                  {/* BACKGROUND GLOW */}
-
-                  <div className="pointer-events-none absolute -bottom-24 -right-24 h-48 w-48 rounded-full bg-white/[0.04] blur-3xl transition group-hover:bg-white/[0.08]" />
-                </Link>
-              </motion.div>
-            ))}
+            <span className="rounded-xl bg-white/5 px-4 py-2">
+              {subcategories.length} Subcategories
+            </span>
           </div>
+        </section>
+
+        {/* Subcategories */}
+        {subcategories.length > 0 && (
+          <section className="mb-10">
+            <h2 className="mb-4 text-xl font-semibold">
+              Subcategories
+            </h2>
+
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {subcategories.map(
+                (subcategory) => (
+                  <div
+                    key={subcategory.id}
+                    className="rounded-2xl border border-white/10 bg-white/[0.03] p-5"
+                  >
+                    <h3 className="font-medium">
+                      {subcategory.name}
+                    </h3>
+
+                    <p className="mt-2 text-sm text-white/40">
+                      {subcategory.description ||
+                        "Browse products in this subcategory."}
+                    </p>
+                  </div>
+                ),
+              )}
+            </div>
+          </section>
         )}
+
+        {/* Products */}
+        <section>
+          <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-xl font-semibold">
+                Products
+              </h2>
+
+              <p className="mt-1 text-sm text-white/40">
+                Products in {category.name}
+              </p>
+            </div>
+
+            <div className="relative w-full sm:w-72">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
+
+              <input
+                type="search"
+                value={search}
+                onChange={(event) =>
+                  setSearch(event.target.value)
+                }
+                placeholder="Search products..."
+                className="w-full rounded-xl border border-white/10 bg-white/5 py-3 pl-10 pr-4 text-sm outline-none placeholder:text-white/30 focus:border-white/20"
+              />
+            </div>
+          </div>
+
+          {filteredProducts.length === 0 ? (
+            <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-6 py-16 text-center">
+              <Package className="mx-auto h-10 w-10 text-white/20" />
+
+              <h3 className="mt-4 font-semibold">
+                No products found
+              </h3>
+
+              <p className="mt-2 text-sm text-white/40">
+                {search
+                  ? "Try another search."
+                  : "There are no products in this category yet."}
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {filteredProducts.map(
+                (product) => (
+                  <Link
+                    key={product.id}
+                    href={`/products/${product.id}`}
+                    className="group"
+                  >
+                    <div className="h-full rounded-3xl border border-white/10 bg-white/[0.04] p-5 transition hover:-translate-y-1 hover:border-white/20 hover:bg-white/[0.07]">
+                      <div className="flex h-40 items-center justify-center rounded-2xl bg-white/[0.04]">
+                        <Package className="h-10 w-10 text-white/20" />
+                      </div>
+
+                      <h3 className="mt-5 font-semibold">
+                        {product.name}
+                      </h3>
+
+                      {product.description && (
+                        <p className="mt-2 line-clamp-2 text-sm text-white/40">
+                          {product.description}
+                        </p>
+                      )}
+
+                      {product.price !==
+                        undefined && (
+                        <p className="mt-4 text-lg font-bold">
+                          ₹
+                          {Number(
+                            product.price,
+                          ).toLocaleString(
+                            "en-IN",
+                          )}
+                        </p>
+                      )}
+                    </div>
+                  </Link>
+                ),
+              )}
+            </div>
+          )}
+        </section>
       </div>
     </main>
   );

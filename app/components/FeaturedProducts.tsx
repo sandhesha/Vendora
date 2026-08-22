@@ -2,54 +2,62 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { Heart, ShoppingCart, ArrowUpRight, Star } from "lucide-react";
+import {
+  Heart,
+  ShoppingCart,
+  ArrowUpRight,
+  Star,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 
-const products = [
-  {
-    id: 1,
-    name: "Aero Runner X",
-    category: "Sneakers",
-    price: "₹4,999",
-    rating: "4.8",
-    image:
-      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=80",
-  },
-  {
-    id: 2,
-    name: "Nova Headphones",
-    category: "Audio",
-    price: "₹7,499",
-    rating: "4.9",
-    image:
-      "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=900&q=80",
-  },
-  {
-    id: 3,
-    name: "Vision Smartwatch",
-    category: "Wearables",
-    price: "₹5,999",
-    rating: "4.7",
-    image:
-      "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=900&q=80",
-  },
-  {
-    id: 4,
-    name: "Urban Backpack",
-    category: "Accessories",
-    price: "₹2,999",
-    rating: "4.6",
-    image:
-      "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=900&q=80",
-  },
-];
+import {
+  getProducts,
+  type Product,
+} from "@/lib/api/products";
+
+import { addCartItem } from "@/lib/api/cart";
+import { useAuth } from "@/lib/auth/auth-context";
 
 export default function FeaturedProducts() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadProducts() {
+      try {
+        const data = await getProducts();
+
+        if (mounted) {
+          setProducts(
+            data
+              .filter((product) => product.is_active)
+              .slice(0, 4)
+          );
+        }
+      } catch (error) {
+        console.error("Failed to load featured products:", error);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadProducts();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   return (
     <section className="relative overflow-hidden px-6 py-28">
-      {/* Background glow */}
       <div className="pointer-events-none absolute right-0 top-1/3 h-96 w-96 rounded-full bg-blue-500/10 blur-3xl" />
 
       <div className="relative mx-auto max-w-7xl">
+
         {/* Heading */}
         <div className="mb-14 flex flex-col justify-between gap-6 md:flex-row md:items-end">
           <motion.div
@@ -64,7 +72,9 @@ export default function FeaturedProducts() {
 
             <h2 className="text-4xl font-bold text-white md:text-6xl">
               Featured{" "}
-              <span className="text-white/40">Products</span>
+              <span className="text-white/40">
+                Products
+              </span>
             </h2>
           </motion.div>
 
@@ -79,16 +89,39 @@ export default function FeaturedProducts() {
           </Link>
         </div>
 
-        {/* Product Grid */}
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {products.map((product, index) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              index={index}
-            />
-          ))}
-        </div>
+        {/* Loading */}
+        {loading && (
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div
+                key={index}
+                className="aspect-square animate-pulse rounded-3xl border border-white/10 bg-white/[0.04]"
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Empty */}
+        {!loading && products.length === 0 && (
+          <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-12 text-center">
+            <p className="text-sm text-white/40">
+              No featured products available.
+            </p>
+          </div>
+        )}
+
+        {/* Products */}
+        {!loading && products.length > 0 && (
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {products.map((product, index) => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                index={index}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );
@@ -98,9 +131,49 @@ function ProductCard({
   product,
   index,
 }: {
-  product: (typeof products)[number];
+  product: Product;
   index: number;
 }) {
+  const { user } = useAuth();
+
+  const [adding, setAdding] = useState(false);
+  const [added, setAdded] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleAddToCart() {
+    setError("");
+
+    if (!user) {
+      setError("Please login first.");
+      return;
+    }
+
+    try {
+      setAdding(true);
+
+      await addCartItem(user.id, {
+        product_id: product.id,
+        variant_id: null,
+        quantity: 1,
+      });
+
+      setAdded(true);
+
+      setTimeout(() => {
+        setAdded(false);
+      }, 1500);
+    } catch (err) {
+      console.error("Failed to add product to cart:", err);
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to add product to cart.",
+      );
+    } finally {
+      setAdding(false);
+    }
+  }
   return (
     <motion.div
       initial={{ opacity: 0, y: 60 }}
@@ -110,26 +183,31 @@ function ProductCard({
         duration: 0.6,
         delay: index * 0.1,
       }}
-      whileHover={{
-        y: -10,
-      }}
+      whileHover={{ y: -10 }}
       className="group relative"
     >
-      {/* Product Image */}
+      {/* Image */}
       <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04]">
+
         <Link href={`/products/${product.id}`}>
           <motion.div
-            whileHover={{
-              scale: 1.08,
-            }}
+            whileHover={{ scale: 1.08 }}
             transition={{ duration: 0.5 }}
             className="aspect-square"
           >
-            <img
-              src={product.image}
-              alt={product.name}
-              className="h-full w-full object-cover"
-            />
+            {product.image_url ? (
+              <img
+                src={product.image_url}
+                alt={product.name}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center bg-white/[0.03]">
+                <span className="text-sm text-white/20">
+                  No image
+                </span>
+              </div>
+            )}
           </motion.div>
         </Link>
 
@@ -148,7 +226,7 @@ function ProductCard({
 
         {/* Category */}
         <span className="absolute bottom-4 left-4 rounded-full border border-white/10 bg-black/40 px-3 py-1 text-xs text-white/70 backdrop-blur-md">
-          {product.category}
+          Product
         </span>
       </div>
 
@@ -163,25 +241,46 @@ function ProductCard({
             </Link>
 
             <div className="mt-2 flex items-center gap-1 text-xs text-white/50">
-              <Star size={13} fill="currentColor" />
-              {product.rating}
+              <Star
+                size={13}
+                fill="currentColor"
+              />
+              <span>4.8</span>
             </div>
           </div>
 
           <span className="font-semibold text-white">
-            {product.price}
+            ₹{product.price.toLocaleString("en-IN")}
           </span>
         </div>
 
         {/* Add to Cart */}
         <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.97 }}
-          className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/10 py-3 text-sm font-medium text-white transition hover:bg-white hover:text-black"
-        >
-          <ShoppingCart size={17} />
-          Add to Cart
-        </motion.button>
+  type="button"
+  whileHover={{
+    scale: 1.02,
+  }}
+  whileTap={{
+    scale: 0.97,
+  }}
+  onClick={handleAddToCart}
+  disabled={adding}
+  className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/10 py-3 text-sm font-medium text-white transition hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-50"
+>
+  <ShoppingCart size={17} />
+
+  {adding
+    ? "Adding..."
+    : added
+      ? "Added ✓"
+      : "Add to Cart"}
+</motion.button>
+
+{error && (
+  <p className="mt-2 text-center text-[10px] text-red-400">
+    {error}
+  </p>
+)}
       </div>
     </motion.div>
   );

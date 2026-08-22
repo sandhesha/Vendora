@@ -7,31 +7,70 @@ class ProductCreate(BaseModel):
     subcategory_id: int | None = None
     brand_id: int | None = None
 
-    name: str = Field(min_length=2, max_length=150)
+    name: str = Field(
+        min_length=1,
+        max_length=150,
+    )
+
     description: str | None = None
 
-    sku: str = Field(min_length=1, max_length=100)
+    sku: str = Field(
+        min_length=1,
+        max_length=100,
+    )
 
-    price: float = Field(gt=0)
-    stock: int = Field(ge=0)
+    price: float = Field(
+        ge=0,
+    )
 
-    image_url: str | None = None
+    stock: int = Field(
+        default=0,
+        ge=0,
+    )
+
+    image_url: str | None = Field(
+        default=None,
+        max_length=500,
+    )
+
     is_active: bool = True
 
 
 class ProductUpdate(BaseModel):
+    vendor_id: int | None = None
     category_id: int | None = None
     subcategory_id: int | None = None
     brand_id: int | None = None
 
-    name: str | None = None
+    name: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=150,
+    )
+
     description: str | None = None
-    sku: str | None = None
 
-    price: float | None = Field(default=None, gt=0)
-    stock: int | None = Field(default=None, ge=0)
+    sku: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=100,
+    )
 
-    image_url: str | None = None
+    price: float | None = Field(
+        default=None,
+        ge=0,
+    )
+
+    stock: int | None = Field(
+        default=None,
+        ge=0,
+    )
+
+    image_url: str | None = Field(
+        default=None,
+        max_length=500,
+    )
+
     is_active: bool | None = None
 
 
@@ -44,8 +83,8 @@ class ProductResponse(BaseModel):
 
     name: str
     description: str | None
-    sku: str
 
+    sku: str
     price: float
     stock: int
 

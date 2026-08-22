@@ -1,6 +1,13 @@
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
+import { createOrders, type Order } from "@/lib/api/orders";
+import {
+  getMyAddresses,
+  type Address,
+} from "@/lib/api/profile";
+import { useAuth } from "@/lib/auth/auth-context";
+
+import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowLeft,
   Check,
@@ -14,8 +21,13 @@ import {
   Truck,
   X,
 } from "lucide-react";
+
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+/* =========================================================
+   DEMO CART ITEMS
+   ========================================================= */
 
 const items = [
   {
@@ -45,30 +57,179 @@ const shipping = 0;
 const tax = Math.round(subtotal * 0.18);
 const total = subtotal + shipping + tax;
 
-export default function CheckoutPage() {
-  const [payment, setPayment] =
-    useState("card");
+/* =========================================================
+   CHECKOUT PAGE
+   ========================================================= */
 
-  const [coupon, setCoupon] =
+export default function CheckoutPage() {
+  const { user, isLoading } = useAuth();
+
+  /* -------------------------------------------------------
+     Payment
+     ------------------------------------------------------- */
+
+  const [payment, setPayment] = useState("cod");
+
+  /* -------------------------------------------------------
+     Address
+     ------------------------------------------------------- */
+
+  const [addresses, setAddresses] = useState<Address[]>([]);
+  const [selectedAddressId, setSelectedAddressId] =
+    useState<number | null>(null);
+
+  const [loadingAddresses, setLoadingAddresses] =
+    useState(true);
+
+  /* -------------------------------------------------------
+     Order
+     ------------------------------------------------------- */
+
+  const [placingOrder, setPlacingOrder] =
+    useState(false);
+
+  const [orderError, setOrderError] =
     useState("");
 
-  const [couponApplied, setCouponApplied] =
-    useState(false);
+  const [createdOrders, setCreatedOrders] =
+    useState<Order[]>([]);
 
   const [ordered, setOrdered] =
     useState(false);
+
+  /* -------------------------------------------------------
+     Coupon
+     ------------------------------------------------------- */
+
+  const [coupon, setCoupon] = useState("");
+  const [couponApplied, setCouponApplied] =
+    useState(false);
+
+  /* =======================================================
+     LOAD ADDRESSES
+     ======================================================= */
+
+  useEffect(() => {
+    async function loadAddresses() {
+      if (isLoading) {
+        return;
+      }
+
+      if (!user) {
+        setLoadingAddresses(false);
+        return;
+      }
+
+      try {
+        setLoadingAddresses(true);
+        setOrderError("");
+
+        const data = await getMyAddresses();
+
+        setAddresses(data);
+
+        const defaultAddress =
+          data.find((address) => address.is_default) ||
+          data[0];
+
+        if (defaultAddress) {
+          setSelectedAddressId(defaultAddress.id);
+        }
+      } catch (error) {
+        console.error(
+          "Failed to load addresses:",
+          error,
+        );
+
+        setOrderError(
+          "Unable to load your delivery addresses.",
+        );
+      } finally {
+        setLoadingAddresses(false);
+      }
+    }
+
+    loadAddresses();
+  }, [user, isLoading]);
+
+  /* =======================================================
+     PLACE ORDER
+     ======================================================= */
+
+  async function handlePlaceOrder() {
+    setOrderError("");
+
+    if (isLoading) {
+      return;
+    }
+
+    if (!user) {
+      setOrderError(
+        "Please log in before placing your order.",
+      );
+      return;
+    }
+
+    if (!selectedAddressId) {
+      setOrderError(
+        "Please select a delivery address.",
+      );
+      return;
+    }
+
+    try {
+      setPlacingOrder(true);
+
+      const orders = await createOrders(user.id, {
+        address_id: selectedAddressId,
+        payment_method: payment,
+      });
+
+      setCreatedOrders(orders);
+      setOrdered(true);
+    } catch (error) {
+      console.error(
+        "Failed to place order:",
+        error,
+      );
+
+      setOrderError(
+        error instanceof Error
+          ? error.message
+          : "Failed to place order.",
+      );
+    } finally {
+      setPlacingOrder(false);
+    }
+  }
+
+  /* =======================================================
+     SELECTED ADDRESS
+     ======================================================= */
+
+  const selectedAddress =
+    addresses.find(
+      (address) =>
+        address.id === selectedAddressId,
+    ) || null;
+
+  /* =======================================================
+     PAGE
+     ======================================================= */
 
   return (
     <main className="min-h-screen bg-black pb-24 pt-24 text-white">
       <div className="mx-auto max-w-7xl px-5 md:px-8">
 
-        {/* HEADER */}
+        {/* =================================================
+            HEADER
+            ================================================= */}
 
         <div className="mb-10 flex items-center justify-between">
 
           <Link
             href="/cart"
-            className="flex items-center gap-2 text-[9px] uppercase tracking-[0.25em] text-white/25 hover:text-white"
+            className="flex items-center gap-2 text-[9px] uppercase tracking-[0.25em] text-white/25 transition hover:text-white"
           >
             <ArrowLeft size={13} />
             Back to cart
@@ -81,23 +242,38 @@ export default function CheckoutPage() {
 
         </div>
 
-        {/* PROGRESS */}
+        {/* =================================================
+            PROGRESS
+            ================================================= */}
 
         <div className="mb-10 flex items-center justify-center gap-3">
 
-          <Step number="01" label="Cart" done />
+          <Step
+            number="01"
+            label="Cart"
+            done
+          />
 
           <div className="h-px w-12 bg-white/10" />
 
-          <Step number="02" label="Checkout" active />
+          <Step
+            number="02"
+            label="Checkout"
+            active
+          />
 
           <div className="h-px w-12 bg-white/10" />
 
-          <Step number="03" label="Complete" />
+          <Step
+            number="03"
+            label="Complete"
+          />
 
         </div>
 
-        {/* TITLE */}
+        {/* =================================================
+            TITLE
+            ================================================= */}
 
         <div className="mb-10">
 
@@ -116,15 +292,41 @@ export default function CheckoutPage() {
 
         </div>
 
-        {/* MAIN GRID */}
+        {/* =================================================
+            ERROR
+            ================================================= */}
+
+        {orderError && (
+          <motion.div
+            initial={{
+              opacity: 0,
+              y: -10,
+            }}
+            animate={{
+              opacity: 1,
+              y: 0,
+            }}
+            className="mb-5 rounded-2xl border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-300"
+          >
+            {orderError}
+          </motion.div>
+        )}
+
+        {/* =================================================
+            MAIN GRID
+            ================================================= */}
 
         <div className="grid gap-5 lg:grid-cols-[1fr_390px]">
 
-          {/* LEFT */}
+          {/* =================================================
+              LEFT
+              ================================================= */}
 
           <div className="space-y-5">
 
-            {/* ADDRESS */}
+            {/* =================================================
+                ADDRESS
+                ================================================= */}
 
             <CheckoutCard
               number="01"
@@ -132,11 +334,16 @@ export default function CheckoutPage() {
               icon={<MapPin size={17} />}
             >
 
-              <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-5">
+              {loadingAddresses ? (
+                <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-5">
+                  <p className="text-[9px] text-white/30">
+                    Loading your addresses...
+                  </p>
+                </div>
+              ) : addresses.length === 0 ? (
+                <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-5">
 
-                <div className="flex items-start justify-between">
-
-                  <div className="flex gap-3">
+                  <div className="flex items-center gap-3">
 
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-black">
                       <MapPin size={15} />
@@ -144,35 +351,133 @@ export default function CheckoutPage() {
 
                     <div>
                       <p className="text-xs font-bold">
-                        Home
+                        No delivery address
                       </p>
 
-                      <p className="mt-2 max-w-md text-[9px] leading-5 text-white/25">
-                        Sandesh
-                        <br />
-                        Kunjathur, Manjeshwar
-                        <br />
-                        Kerala, India
+                      <p className="mt-1 text-[9px] text-white/25">
+                        Please add an address before
+                        placing your order.
                       </p>
                     </div>
 
                   </div>
 
-                  <button className="text-[8px] text-white/25 hover:text-white">
-                    Change
-                  </button>
+                  <Link
+                    href="/profile"
+                    className="mt-4 flex w-full items-center justify-center rounded-xl bg-white py-3 text-[8px] font-bold uppercase tracking-[0.15em] text-black"
+                  >
+                    Add address
+                  </Link>
 
                 </div>
+              ) : (
+                <div className="space-y-3">
 
-              </div>
+                  {addresses.map((address) => {
+                    const selected =
+                      address.id ===
+                      selectedAddressId;
 
-              <button className="mt-3 flex w-full items-center justify-center rounded-xl border border-dashed border-white/10 py-3 text-[9px] text-white/25 hover:border-white/30 hover:text-white">
+                    return (
+                      <button
+                        key={address.id}
+                        type="button"
+                        onClick={() =>
+                          setSelectedAddressId(
+                            address.id,
+                          )
+                        }
+                        className={`w-full rounded-2xl border p-5 text-left transition ${
+                          selected
+                            ? "border-white/30 bg-white/[0.05]"
+                            : "border-white/10 bg-white/[0.025] hover:border-white/20"
+                        }`}
+                      >
+
+                        <div className="flex items-start justify-between gap-4">
+
+                          <div className="flex gap-3">
+
+                            <div
+                              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                                selected
+                                  ? "bg-white text-black"
+                                  : "bg-white/[0.05] text-white/30"
+                              }`}
+                            >
+                              <MapPin size={15} />
+                            </div>
+
+                            <div>
+
+                              <div className="flex items-center gap-2">
+
+                                <p className="text-xs font-bold">
+                                  {address.full_name}
+                                </p>
+
+                                {address.is_default && (
+                                  <span className="rounded-full border border-white/10 px-2 py-1 text-[6px] uppercase tracking-[0.15em] text-white/30">
+                                    Default
+                                  </span>
+                                )}
+
+                              </div>
+
+                              <p className="mt-2 text-[9px] leading-5 text-white/30">
+                                {address.address_line}
+                                <br />
+                                {address.city},{" "}
+                                {address.state}
+                                <br />
+                                {address.postal_code},{" "}
+                                {address.country}
+                              </p>
+
+                              <p className="mt-2 text-[8px] text-white/20">
+                                {address.phone}
+                              </p>
+
+                            </div>
+
+                          </div>
+
+                          <div
+                            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
+                              selected
+                                ? "border-white bg-white"
+                                : "border-white/20"
+                            }`}
+                          >
+                            {selected && (
+                              <Check
+                                size={11}
+                                className="text-black"
+                              />
+                            )}
+                          </div>
+
+                        </div>
+
+                      </button>
+                    );
+                  })}
+
+                </div>
+              )}
+
+              <Link
+                href="/profile"
+                className="mt-3 flex w-full items-center justify-center rounded-xl border border-dashed border-white/10 py-3 text-[9px] text-white/25 transition hover:border-white/30 hover:text-white"
+              >
                 + Add another address
-              </button>
+              </Link>
 
             </CheckoutCard>
 
-            {/* SHIPPING */}
+            {/* =================================================
+                SHIPPING
+                ================================================= */}
 
             <CheckoutCard
               number="02"
@@ -199,7 +504,9 @@ export default function CheckoutPage() {
 
             </CheckoutCard>
 
-            {/* PAYMENT */}
+            {/* =================================================
+                PAYMENT
+                ================================================= */}
 
             <CheckoutCard
               number="03"
@@ -211,18 +518,24 @@ export default function CheckoutPage() {
 
                 <PaymentOption
                   id="card"
-                  selected={payment === "card"}
+                  selected={
+                    payment === "card"
+                  }
                   onClick={() =>
                     setPayment("card")
                   }
-                  icon={<CreditCard size={15} />}
+                  icon={
+                    <CreditCard size={15} />
+                  }
                   title="Credit / Debit Card"
                   subtitle="Visa, Mastercard, RuPay"
                 />
 
                 <PaymentOption
                   id="upi"
-                  selected={payment === "upi"}
+                  selected={
+                    payment === "upi"
+                  }
                   onClick={() =>
                     setPayment("upi")
                   }
@@ -237,11 +550,15 @@ export default function CheckoutPage() {
 
                 <PaymentOption
                   id="cod"
-                  selected={payment === "cod"}
+                  selected={
+                    payment === "cod"
+                  }
                   onClick={() =>
                     setPayment("cod")
                   }
-                  icon={<Package size={15} />}
+                  icon={
+                    <Package size={15} />
+                  }
                   title="Cash on delivery"
                   subtitle="Pay when your order arrives"
                 />
@@ -266,9 +583,7 @@ export default function CheckoutPage() {
                     }}
                     className="overflow-hidden"
                   >
-
                     <CardForm />
-
                   </motion.div>
                 )}
 
@@ -284,6 +599,7 @@ export default function CheckoutPage() {
                     }}
                     className="mt-4 rounded-2xl border border-white/10 bg-white/[0.02] p-5"
                   >
+
                     <label className="text-[8px] uppercase tracking-[0.2em] text-white/20">
                       UPI ID
                     </label>
@@ -292,6 +608,7 @@ export default function CheckoutPage() {
                       placeholder="yourname@upi"
                       className="mt-3 w-full rounded-xl border border-white/10 bg-black px-4 py-3 text-xs outline-none placeholder:text-white/15 focus:border-white/30"
                     />
+
                   </motion.div>
                 )}
 
@@ -299,7 +616,9 @@ export default function CheckoutPage() {
 
             </CheckoutCard>
 
-            {/* PROTECTION */}
+            {/* =================================================
+                PROTECTION
+                ================================================= */}
 
             <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.02] p-5">
 
@@ -308,6 +627,7 @@ export default function CheckoutPage() {
               </div>
 
               <div>
+
                 <p className="text-[10px] font-bold">
                   Protected checkout
                 </p>
@@ -316,19 +636,22 @@ export default function CheckoutPage() {
                   Your payment information is encrypted
                   and securely processed.
                 </p>
+
               </div>
 
             </div>
 
           </div>
 
-          {/* RIGHT SUMMARY */}
+          {/* =================================================
+              RIGHT SUMMARY
+              ================================================= */}
 
           <aside className="lg:sticky lg:top-24 lg:self-start">
 
             <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.025]">
 
-              {/* 3D TOTAL */}
+              {/* TOTAL */}
 
               <div className="relative overflow-hidden border-b border-white/10 p-6">
 
@@ -337,7 +660,8 @@ export default function CheckoutPage() {
                   style={{
                     backgroundImage:
                       "linear-gradient(rgba(255,255,255,.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.5) 1px, transparent 1px)",
-                    backgroundSize: "35px 35px",
+                    backgroundSize:
+                      "35px 35px",
                   }}
                 />
 
@@ -357,7 +681,10 @@ export default function CheckoutPage() {
                     }}
                     className="mt-3 text-4xl font-black"
                   >
-                    ₹{total.toLocaleString("en-IN")}
+                    ₹
+                    {total.toLocaleString(
+                      "en-IN",
+                    )}
                   </motion.p>
 
                   <div className="mt-4 flex items-center gap-2 text-[8px] text-white/25">
@@ -437,7 +764,9 @@ export default function CheckoutPage() {
                       <input
                         value={coupon}
                         onChange={(e) =>
-                          setCoupon(e.target.value)
+                          setCoupon(
+                            e.target.value,
+                          )
                         }
                         placeholder="Promo code"
                         className="w-full rounded-xl border border-white/10 bg-black py-3 pl-9 pr-3 text-[9px] outline-none placeholder:text-white/15"
@@ -446,9 +775,12 @@ export default function CheckoutPage() {
                     </div>
 
                     <button
+                      type="button"
                       onClick={() =>
                         setCouponApplied(
-                          Boolean(coupon),
+                          Boolean(
+                            coupon.trim(),
+                          ),
                         )
                       }
                       className="rounded-xl bg-white px-4 py-3 text-[8px] font-bold text-black"
@@ -482,7 +814,9 @@ export default function CheckoutPage() {
 
                   <PriceRow
                     label="Subtotal"
-                    value={`₹${subtotal.toLocaleString("en-IN")}`}
+                    value={`₹${subtotal.toLocaleString(
+                      "en-IN",
+                    )}`}
                   />
 
                   <PriceRow
@@ -492,7 +826,9 @@ export default function CheckoutPage() {
 
                   <PriceRow
                     label="Tax (18%)"
-                    value={`₹${tax.toLocaleString("en-IN")}`}
+                    value={`₹${tax.toLocaleString(
+                      "en-IN",
+                    )}`}
                   />
 
                 </div>
@@ -504,27 +840,80 @@ export default function CheckoutPage() {
                   </span>
 
                   <span className="text-2xl font-black">
-                    ₹{total.toLocaleString("en-IN")}
+                    ₹
+                    {total.toLocaleString(
+                      "en-IN",
+                    )}
                   </span>
 
                 </div>
 
+                {/* SELECTED ADDRESS INFO */}
+
+                {selectedAddress && (
+                  <div className="mt-5 rounded-xl border border-white/10 bg-white/[0.02] p-4">
+
+                    <div className="flex items-center gap-2">
+
+                      <MapPin
+                        size={12}
+                        className="text-white/30"
+                      />
+
+                      <span className="text-[8px] uppercase tracking-[0.15em] text-white/30">
+                        Delivering to
+                      </span>
+
+                    </div>
+
+                    <p className="mt-2 text-[9px] font-semibold">
+                      {selectedAddress.full_name}
+                    </p>
+
+                    <p className="mt-1 text-[8px] leading-4 text-white/20">
+                      {selectedAddress.city},{" "}
+                      {selectedAddress.state}{" "}
+                      {selectedAddress.postal_code}
+                    </p>
+
+                  </div>
+                )}
+
                 {/* ORDER BUTTON */}
 
                 <motion.button
+                  type="button"
                   whileHover={{
-                    scale: 1.015,
+                    scale: placingOrder
+                      ? 1
+                      : 1.015,
                   }}
                   whileTap={{
-                    scale: 0.97,
+                    scale: placingOrder
+                      ? 1
+                      : 0.97,
                   }}
-                  onClick={() =>
-                    setOrdered(true)
+                  disabled={
+                    placingOrder ||
+                    loadingAddresses ||
+                    !selectedAddressId
                   }
-                  className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-white py-4 text-[9px] font-black uppercase tracking-[0.2em] text-black shadow-[0_15px_50px_rgba(255,255,255,.08)]"
+                  onClick={handlePlaceOrder}
+                  className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-white py-4 text-[9px] font-black uppercase tracking-[0.2em] text-black shadow-[0_15px_50px_rgba(255,255,255,.08)] disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  Place order
-                  <ChevronRight size={13} />
+
+                  {placingOrder ? (
+                    <>
+                      <span className="h-3 w-3 animate-spin rounded-full border-2 border-black/30 border-t-black" />
+                      Placing order...
+                    </>
+                  ) : (
+                    <>
+                      Place order
+                      <ChevronRight size={13} />
+                    </>
+                  )}
+
                 </motion.button>
 
                 <p className="mt-4 text-center text-[7px] leading-4 text-white/15">
@@ -542,7 +931,9 @@ export default function CheckoutPage() {
 
       </div>
 
-      {/* SUCCESS MODAL */}
+      {/* =================================================
+          SUCCESS MODAL
+          ================================================= */}
 
       <AnimatePresence>
         {ordered && (
@@ -574,6 +965,7 @@ export default function CheckoutPage() {
             >
 
               <button
+                type="button"
                 onClick={() =>
                   setOrdered(false)
                 }
@@ -608,19 +1000,67 @@ export default function CheckoutPage() {
                 throughout the delivery.
               </p>
 
-              <div className="mt-7 rounded-2xl border border-white/10 bg-white/[0.025] p-4">
+              {/* CREATED ORDERS */}
 
-                <div className="flex justify-between text-[9px]">
-                  <span className="text-white/20">
-                    Order ID
-                  </span>
+              {createdOrders.length > 0 && (
+                <div className="mt-7 space-y-2">
 
-                  <span className="font-bold">
-                    #VND-20481
-                  </span>
+                  {createdOrders.map(
+                    (order) => (
+                      <div
+                        key={order.id}
+                        className="rounded-2xl border border-white/10 bg-white/[0.025] p-4"
+                      >
+
+                        <div className="flex justify-between text-[9px]">
+
+                          <span className="text-white/20">
+                            Order ID
+                          </span>
+
+                          <span className="font-bold">
+                            {order.order_number}
+                          </span>
+
+                        </div>
+
+                        <div className="mt-2 flex justify-between text-[9px]">
+
+                          <span className="text-white/20">
+                            Total
+                          </span>
+
+                          <span className="font-bold">
+                            ₹
+                            {Number(
+                              order.total,
+                            ).toLocaleString(
+                              "en-IN",
+                            )}
+                          </span>
+
+                        </div>
+
+                        <div className="mt-2 flex justify-between text-[9px]">
+
+                          <span className="text-white/20">
+                            Payment
+                          </span>
+
+                          <span className="font-bold uppercase">
+                            {
+                              order.payment_method
+                            }
+                          </span>
+
+                        </div>
+
+                      </div>
+                    ),
+                  )}
+
                 </div>
-
-              </div>
+              )}
 
               <Link
                 href="/orders"
@@ -639,9 +1079,9 @@ export default function CheckoutPage() {
   );
 }
 
-/* ============================= */
-/* STEP */
-/* ============================= */
+/* =========================================================
+   STEP
+   ========================================================= */
 
 function Step({
   number,
@@ -662,6 +1102,7 @@ function Step({
           : "text-white/20"
       }`}
     >
+
       <span
         className={`flex h-7 w-7 items-center justify-center rounded-full border ${
           active
@@ -671,23 +1112,26 @@ function Step({
               : "border-white/10"
         }`}
       >
+
         {done ? (
           <Check size={11} />
         ) : (
           number
         )}
+
       </span>
 
       <span className="hidden sm:block">
         {label}
       </span>
+
     </div>
   );
 }
 
-/* ============================= */
-/* CHECKOUT CARD */
-/* ============================= */
+/* =========================================================
+   CHECKOUT CARD
+   ========================================================= */
 
 function CheckoutCard({
   number,
@@ -737,9 +1181,9 @@ function CheckoutCard({
   );
 }
 
-/* ============================= */
-/* SHIPPING */
-/* ============================= */
+/* =========================================================
+   SHIPPING OPTION
+   ========================================================= */
 
 function ShippingOption({
   title,
@@ -792,9 +1236,9 @@ function ShippingOption({
   );
 }
 
-/* ============================= */
-/* PAYMENT OPTION */
-/* ============================= */
+/* =========================================================
+   PAYMENT OPTION
+   ========================================================= */
 
 function PaymentOption({
   id,
@@ -813,6 +1257,7 @@ function PaymentOption({
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       className={`flex w-full items-center gap-4 rounded-2xl border p-4 text-left transition ${
         selected
@@ -859,9 +1304,9 @@ function PaymentOption({
   );
 }
 
-/* ============================= */
-/* CARD FORM */
-/* ============================= */
+/* =========================================================
+   CARD FORM
+   ========================================================= */
 
 function CardForm() {
   return (
@@ -881,6 +1326,7 @@ function CardForm() {
           />
 
           <input
+            type="text"
             placeholder="1234 5678 9012 3456"
             className="w-full rounded-xl border border-white/10 bg-black py-3 pl-9 pr-3 text-xs outline-none placeholder:text-white/15 focus:border-white/30"
           />
@@ -912,9 +1358,9 @@ function CardForm() {
   );
 }
 
-/* ============================= */
-/* INPUT */
-/* ============================= */
+/* =========================================================
+   INPUT
+   ========================================================= */
 
 function Input({
   label,
@@ -931,6 +1377,7 @@ function Input({
       </label>
 
       <input
+        type="text"
         placeholder={placeholder}
         className="mt-2 w-full rounded-xl border border-white/10 bg-black px-3 py-3 text-xs outline-none placeholder:text-white/15 focus:border-white/30"
       />
@@ -939,9 +1386,9 @@ function Input({
   );
 }
 
-/* ============================= */
-/* PRICE ROW */
-/* ============================= */
+/* =========================================================
+   PRICE ROW
+   ========================================================= */
 
 function PriceRow({
   label,

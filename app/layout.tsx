@@ -2,10 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth/auth-context";
-import Navbar from "./components/Navbar";
-import MobileNav from "@/components/layout/MobileNav";
-
-
+import ConditionalNavbar from "./components/ConditionalNavbar";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -19,7 +16,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Multi-Vendor Marketplace",
-  description: "Authentication and vendor management platform",
+  description:
+    "Authentication and vendor management platform",
 };
 
 export default function RootLayout({
@@ -33,11 +31,10 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full">
-        <Navbar />
-        <AuthProvider>{children}
-          <MobileNav />
+        <AuthProvider>
+          <ConditionalNavbar />
+          {children}
         </AuthProvider>
-
       </body>
     </html>
   );

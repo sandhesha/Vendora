@@ -1,7 +1,6 @@
-from sqlalchemy import Column, ForeignKey, Integer, String
-
+from sqlalchemy import Column, Integer, String, ForeignKey
+from sqlalchemy.orm import relationship
 from backend.database import Base
-
 
 class ProductAttribute(Base):
     __tablename__ = "product_attributes"

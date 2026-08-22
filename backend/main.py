@@ -1,12 +1,17 @@
 from fastapi import Depends, FastAPI, HTTPException
-
+from backend.models import AuditLog
+from backend.schemas.audit_log import AuditLogResponse
 from fastapi.security import (HTTPAuthorizationCredentials, HTTPBearer,)
 from fastapi.middleware.cors import CORSMiddleware
 from jose import JWTError, jwt
+from backend.models.vendor import Vendor
 from sqlalchemy.orm import Session
 from backend.core.security import (ALGORITHM,SECRET_KEY,create_access_token,hash_password,verify_password,)
 from backend.database import Base, SessionLocal, engine
+from backend.models.product_attribute import ProductAttribute
+from backend.models.refund import Refund
 from backend.models import (User,Vendor, Address,Category,Subcategory,Brand,)
+from backend.schemas.vendor import PublicVendorResponse
 from backend.schemas.category import (CategoryCreate,CategoryUpdate,CategoryResponse,SubcategoryCreate,SubcategoryUpdate,SubcategoryResponse,)
 from backend.models import (
     User,
@@ -27,7 +32,15 @@ from backend.schemas.product_image import (
     ProductImageResponse,)
 from backend.schemas.brand import (BrandCreate,BrandUpdate,BrandResponse,)
 from backend.schemas.address import (AddressCreate,AddressUpdate,AddressResponse,)
-from backend.schemas.auth import (UserLogin,UserRegister,UserResponse,UserProfileUpdate,VendorRegister,VendorResponse,)
+from backend.schemas.auth import (
+    UserLogin,
+    UserRegister,
+    UserResponse,
+    UserProfileUpdate,
+    VendorRegister,
+    VendorResponse,
+    ChangePasswordRequest,
+)
 from backend.models import ProductVariant
 from backend.schemas.product_variant import (
     ProductVariantCreate,
@@ -164,6 +177,7 @@ def register(
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+    
 
     return new_user
 
@@ -247,6 +261,95 @@ def get_current_user(
         )
 
     return user
+
+
+
+@app.post("/auth/change-password")
+def change_password(
+    password_data: ChangePasswordRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db),
+):
+    token = credentials.credentials
+
+    try:
+        payload = jwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=[ALGORITHM],
+        )
+
+        user_id = payload.get("sub")
+
+        if not user_id:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid authentication token",
+            )
+
+    except JWTError:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid authentication token",
+        )
+
+    user = (
+        db.query(User)
+        .filter(User.id == int(user_id))
+        .first()
+    )
+
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail="User not found",
+        )
+
+    # Verify current password
+    if not verify_password(
+        password_data.current_password,
+        user.password_hash,
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Current password is incorrect",
+        )
+
+    # Check new password confirmation
+    if password_data.new_password != password_data.confirm_password:
+        raise HTTPException(
+            status_code=400,
+            detail="New passwords do not match",
+        )
+
+    # Prevent using the same password
+    if password_data.current_password == password_data.new_password:
+        raise HTTPException(
+            status_code=400,
+            detail="New password must be different from current password",
+        )
+
+    # Validate password length
+    if len(password_data.new_password) < 8:
+        raise HTTPException(
+            status_code=400,
+            detail="New password must be at least 8 characters long",
+        )
+
+    # Hash and save new password
+    user.password_hash = hash_password(
+        password_data.new_password
+    )
+
+    db.commit()
+    db.refresh(user)
+
+    return {
+        "message": "Password changed successfully"
+    }
+
+
+
 @app.get("/users/me", response_model=UserResponse)
 def get_my_profile(
     credentials: HTTPAuthorizationCredentials = Depends(security),
@@ -386,9 +489,41 @@ def get_current_admin(
 
     return user
 
+@app.get(
+    "/vendors",
+    response_model=list[AdminVendorResponse],
+)
+def get_public_vendors(
+    db: Session = Depends(get_db),
+):
+    vendors = (
+        db.query(Vendor)
+        .filter(Vendor.approval_status == "approved")
+        .order_by(Vendor.id.desc())
+        .all()
+    )
+
+    return vendors
 
 
-@app.patch("/admin/vendors/{vendor_id}/approve")
+@app.get(
+    "/vendors",
+    response_model=list[PublicVendorResponse],
+)
+def get_public_vendors(
+    db: Session = Depends(get_db),
+):
+    return (
+        db.query(Vendor)
+        .filter(Vendor.approval_status == "approved")
+        .order_by(Vendor.id.desc())
+        .all()
+    )
+
+@app.patch(
+    "/admin/vendors/{vendor_id}/approve",
+    response_model=AdminVendorResponse,
+)
 def approve_vendor(
     vendor_id: int,
     db: Session = Depends(get_db),
@@ -411,14 +546,13 @@ def approve_vendor(
     db.commit()
     db.refresh(vendor)
 
-    return {
-        "message": "Vendor approved successfully",
-        "vendor_id": vendor.id,
-        "approval_status": vendor.approval_status,
-    }
+    return vendor
 
 
-@app.patch("/admin/vendors/{vendor_id}/reject")
+@app.patch(
+    "/admin/vendors/{vendor_id}/reject",
+    response_model=AdminVendorResponse,
+)
 def reject_vendor(
     vendor_id: int,
     db: Session = Depends(get_db),
@@ -441,13 +575,10 @@ def reject_vendor(
     db.commit()
     db.refresh(vendor)
 
-    return {
-        "message": "Vendor rejected",
-        "vendor_id": vendor.id,
-        "approval_status": vendor.approval_status,
-    }
+    return vendor
 
-def get_current_vendor(
+
+def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db),
 ):
@@ -468,7 +599,9 @@ def get_current_vendor(
                 detail="Invalid token",
             )
 
-    except JWTError:
+        user_id = int(user_id)
+
+    except (JWTError, ValueError, TypeError):
         raise HTTPException(
             status_code=401,
             detail="Invalid or expired token",
@@ -476,7 +609,7 @@ def get_current_vendor(
 
     user = (
         db.query(User)
-        .filter(User.id == int(user_id))
+        .filter(User.id == user_id)
         .first()
     )
 
@@ -486,71 +619,32 @@ def get_current_vendor(
             detail="User not found",
         )
 
-    if user.role != "vendor":
+    if not user.is_active:
         raise HTTPException(
             status_code=403,
-            detail="Vendor access required",
+            detail="User account is inactive",
         )
 
-    vendor = (
-        db.query(Vendor)
-        .filter(Vendor.user_id == user.id)
-        .first()
-    )
+    return user
 
-    if not vendor:
-        raise HTTPException(
-            status_code=404,
-            detail="Vendor profile not found",
-        )
 
-    if vendor.approval_status != "approved":
+def get_current_admin(
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "admin":
         raise HTTPException(
             status_code=403,
-            detail="Vendor is not approved",
+            detail="Admin access required",
         )
 
-    return vendor
+    return current_user
+
+
 def get_current_vendor(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    token = credentials.credentials
-
-    try:
-        payload = jwt.decode(
-            token,
-            SECRET_KEY,
-            algorithms=[ALGORITHM],
-        )
-
-        user_id = payload.get("sub")
-
-        if user_id is None:
-            raise HTTPException(
-                status_code=401,
-                detail="Invalid token",
-            )
-
-    except JWTError:
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid or expired token",
-        )
-
-    user = (
-        db.query(User)
-        .filter(User.id == int(user_id))
-        .first()
-    )
-
-    if not user:
-        raise HTTPException(
-            status_code=404,
-            detail="User not found",
-        )
-
-    if user.role != "vendor":
+    if current_user.role != "vendor":
         raise HTTPException(
             status_code=403,
             detail="Vendor access required",
@@ -558,7 +652,7 @@ def get_current_vendor(
 
     vendor = (
         db.query(Vendor)
-        .filter(Vendor.user_id == user.id)
+        .filter(Vendor.user_id == current_user.id)
         .first()
     )
 
@@ -568,13 +662,34 @@ def get_current_vendor(
             detail="Vendor profile not found",
         )
 
-    if vendor.approval_status != "approved":
+    return vendor
+
+
+def get_current_customer(
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != "customer":
         raise HTTPException(
             status_code=403,
-            detail="Vendor is not approved",
+            detail="Customer access required",
         )
 
-    return vendor
+    return current_user
+
+
+def require_roles(*allowed_roles: str):
+    def role_dependency(
+        current_user: User = Depends(get_current_user),
+    ):
+        if current_user.role not in allowed_roles:
+            raise HTTPException(
+                status_code=403,
+                detail="You do not have permission to access this resource",
+            )
+
+        return current_user
+
+    return role_dependency
 
 
 @app.get("/vendor/me")
@@ -1318,7 +1433,36 @@ def create_product(
 def get_products(
     db: Session = Depends(get_db),
 ):
-    return db.query(Product).all()
+    products = (
+        db.query(
+            Product,
+            Category.name.label("category_name"),
+            Brand.name.label("brand_name"),
+        )
+        .outerjoin(Category, Product.category_id == Category.id)
+        .outerjoin(Brand, Product.brand_id == Brand.id)
+        .all()
+    )
+
+    return [
+        ProductResponse(
+            id=product.id,
+            vendor_id=product.vendor_id,
+            category_id=product.category_id,
+            subcategory_id=product.subcategory_id,
+            brand_id=product.brand_id,
+            category_name=category_name,
+            brand_name=brand_name,
+            name=product.name,
+            description=product.description,
+            sku=product.sku,
+            price=product.price,
+            stock=product.stock,
+            image_url=product.image_url,
+            is_active=product.is_active,
+        )
+        for product, category_name, brand_name in products
+    ]
 
 
 @app.get("/products/{product_id}", response_model=ProductResponse)
@@ -4983,6 +5127,9 @@ def get_vendor_orders(
     return orders
 
 
+
+
+
 @app.get(
     "/admin/reports",
 )
@@ -5051,3 +5198,53 @@ def get_admin_reports(
         "total_commission": total_commission,
         "total_refunds": total_refunds,
     }
+@app.get("/admin/customers", response_model=list[UserResponse])
+def get_admin_customers(
+    db: Session = Depends(get_db),
+):
+    customers = (
+        db.query(User)
+        .filter(User.role == "customer")
+        .order_by(User.id.desc())
+        .all()
+    )
+
+    return customers
+
+@app.get(
+    "/admin/audit-logs",
+    response_model=list[AuditLogResponse],
+)
+def get_audit_logs(
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(get_current_admin),
+):
+    logs = (
+        db.query(AuditLog)
+        .order_by(AuditLog.created_at.desc())
+        .all()
+    )
+
+    return logs
+
+def create_audit_log(
+    db: Session,
+    user_id: int | None,
+    action: str,
+    entity_type: str | None = None,
+    entity_id: int | None = None,
+    details: str | None = None,
+):
+    audit_log = AuditLog(
+        user_id=user_id,
+        action=action,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        details=details,
+    )
+
+    db.add(audit_log)
+    db.commit()
+
+    return audit_log
+

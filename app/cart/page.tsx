@@ -1,590 +1,721 @@
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
+  ArrowLeft,
   ArrowRight,
   Check,
-  ChevronDown,
   Minus,
   Plus,
   ShoppingBag,
   Sparkles,
-  Tag,
   Trash2,
   Truck,
   ShieldCheck,
+  Package,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+
+import { useAuth } from "@/lib/auth/auth-context";
 
 type CartItem = {
   id: number;
-  name: string;
-  vendor: string;
+  product_id: number;
+  product_name: string;
   price: number;
   quantity: number;
-  image: string;
+  image_url?: string | null;
+  stock?: number;
 };
 
-const initialCart: CartItem[] = [
-  {
-    id: 1,
-    name: "Aero Runner X",
-    vendor: "Aero Labs",
-    price: 8499,
-    quantity: 1,
-    image: "👟",
-  },
-  {
-    id: 2,
-    name: "Nova Pro",
-    vendor: "Nova Tech",
-    price: 12499,
-    quantity: 1,
-    image: "🎧",
-  },
-  {
-    id: 3,
-    name: "Urban Core",
-    vendor: "Urban Supply",
-    price: 4999,
-    quantity: 2,
-    image: "🎒",
-  },
-];
+const FALLBACK_IMAGE =
+  "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=900&q=80";
 
 export default function CartPage() {
-  const [items, setItems] =
-    useState<CartItem[]>(initialCart);
+  const { user } = useAuth();
 
-  const [coupon, setCoupon] =
-    useState("");
+  const [items, setItems] = useState<CartItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const [couponApplied, setCouponApplied] =
-    useState(false);
+  /*
+   * LOAD CART
+   *
+   * Keep your existing backend cart API here if your current
+   * implementation already has one.
+   */
+  useEffect(() => {
+    async function loadCart() {
+      try {
+        setLoading(true);
 
-  const [couponOpen, setCouponOpen] =
-    useState(false);
+        /*
+         * Replace this section with your existing getCart()
+         * API call if you already have one.
+         */
+        setItems([]);
+      } catch (error) {
+        console.error("Failed to load cart:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
 
-  const updateQuantity = (
-    id: number,
-    change: number,
-  ) => {
+    if (user) {
+      loadCart();
+    } else {
+      setLoading(false);
+    }
+  }, [user]);
+
+  /*
+   * TOTALS
+   */
+  const subtotal = useMemo(() => {
+    return items.reduce(
+      (total, item) =>
+        total + Number(item.price) * item.quantity,
+      0,
+    );
+  }, [items]);
+
+  const delivery = subtotal >= 20000 || subtotal === 0 ? 0 : 499;
+
+  const total = subtotal + delivery;
+
+  /*
+   * QUANTITY
+   */
+  const decreaseQuantity = (id: number) => {
     setItems((current) =>
-      current
-        .map((item) =>
-          item.id === id
-            ? {
-                ...item,
-                quantity: Math.max(
-                  1,
-                  item.quantity + change,
-                ),
-              }
-            : item,
-        ),
+      current.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              quantity: Math.max(1, item.quantity - 1),
+            }
+          : item,
+      ),
     );
   };
 
+  const increaseQuantity = (id: number) => {
+    setItems((current) =>
+      current.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              quantity:
+                item.stock && item.quantity >= item.stock
+                  ? item.quantity
+                  : item.quantity + 1,
+            }
+          : item,
+      ),
+    );
+  };
+
+  /*
+   * REMOVE
+   */
   const removeItem = (id: number) => {
     setItems((current) =>
-      current.filter(
-        (item) => item.id !== id,
-      ),
+      current.filter((item) => item.id !== id),
     );
   };
 
-  const subtotal = useMemo(
-    () =>
-      items.reduce(
-        (total, item) =>
-          total +
-          item.price * item.quantity,
-        0,
-      ),
-    [items],
-  );
+  /*
+   * NOT LOGGED IN
+   */
+  if (!user) {
+    return (
+      <main className="relative min-h-screen overflow-hidden bg-[#f7f8fa] px-5 pb-24 pt-32 text-slate-900 md:px-8">
 
-  const delivery =
-    subtotal >= 2000 || subtotal === 0
-      ? 0
-      : 99;
+        {/* BACKGROUND 3D OBJECTS */}
+        <FloatingOrb
+          className="left-[5%] top-[18%]"
+          size="h-24 w-24"
+          delay={0}
+        />
 
-  const discount = couponApplied
-    ? Math.round(subtotal * 0.1)
-    : 0;
+        <FloatingOrb
+          className="right-[8%] top-[35%]"
+          size="h-16 w-16"
+          delay={1.5}
+        />
 
-  const total =
-    subtotal + delivery - discount;
-
-  return (
-    <main className="min-h-screen bg-black pb-28 pt-24 text-white">
-
-      <div className="mx-auto max-w-7xl px-5 md:px-8">
-
-        {/* ================================= */}
-        {/* HERO */}
-        {/* ================================= */}
-
-        <section className="relative overflow-hidden rounded-[2.7rem] border border-white/10 bg-white/[0.025] px-7 py-14 md:px-14">
-
-          <div
-            className="absolute inset-0 opacity-[0.06]"
-            style={{
-              backgroundImage:
-                "linear-gradient(rgba(255,255,255,.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.5) 1px, transparent 1px)",
-              backgroundSize: "55px 55px",
-            }}
-          />
+        <div className="relative z-10 mx-auto flex min-h-[65vh] max-w-xl flex-col items-center justify-center text-center">
 
           <motion.div
+            initial={{ opacity: 0, scale: 0.7, rotateX: 25 }}
             animate={{
-              scale: [1, 1.15, 1],
-              opacity: [0.08, 0.16, 0.08],
+              opacity: 1,
+              scale: 1,
+              rotateX: 0,
+              y: [0, -10, 0],
             }}
             transition={{
-              duration: 5,
-              repeat: Infinity,
+              duration: 0.8,
+              y: {
+                duration: 4,
+                repeat: Infinity,
+                ease: "easeInOut",
+              },
             }}
-            className="absolute left-1/2 top-1/2 h-[400px] w-[400px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white blur-[130px]"
-          />
+            className="mb-8 flex h-28 w-28 items-center justify-center rounded-[2rem] border border-white bg-white shadow-[0_30px_80px_rgba(15,23,42,0.12)]"
+            style={{ transformStyle: "preserve-3d" }}
+          >
+            <ShoppingBag size={46} strokeWidth={1.4} />
+          </motion.div>
 
-          <div className="relative z-10 grid items-center gap-12 md:grid-cols-[1fr_300px]">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
+            Vendora Cart
+          </p>
 
-            <div>
+          <h1 className="text-4xl font-bold tracking-tight md:text-5xl">
+            Your cart is waiting.
+          </h1>
 
-              <div className="flex items-center gap-2 text-[9px] uppercase tracking-[0.35em] text-white/25">
-                <Sparkles size={11} />
-                Shopping bag
+          <p className="mt-4 max-w-md text-sm leading-7 text-slate-500">
+            Sign in to access your cart and continue
+            shopping from Vendora vendors.
+          </p>
+
+          <Link
+            href="/auth/login"
+            className="mt-8 inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-7 py-4 text-sm font-semibold text-white shadow-xl transition hover:-translate-y-1 hover:shadow-2xl"
+          >
+            Sign in
+            <ArrowRight size={16} />
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
+  /*
+   * LOADING
+   */
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-[#f7f8fa] px-5 pb-24 pt-32 md:px-8">
+        <div className="mx-auto max-w-7xl">
+
+          <div className="animate-pulse">
+
+            <div className="h-4 w-28 rounded bg-slate-200" />
+
+            <div className="mt-5 h-12 w-64 rounded-xl bg-slate-200" />
+
+            <div className="mt-12 grid gap-8 lg:grid-cols-[1fr_380px]">
+
+              <div className="space-y-4">
+                {[1, 2, 3].map((item) => (
+                  <div
+                    key={item}
+                    className="h-40 rounded-[2rem] bg-white shadow-sm"
+                  />
+                ))}
               </div>
 
-              <h1 className="mt-5 text-5xl font-black tracking-tight md:text-7xl">
-                Your Cart
-              </h1>
-
-              <p className="mt-5 max-w-lg text-sm leading-7 text-white/30">
-                Everything you've selected,
-                ready for the next step.
-              </p>
-
-              <div className="mt-7 flex items-center gap-3">
-
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-black">
-                  <ShoppingBag size={17} />
-                </div>
-
-                <div>
-                  <p className="text-sm font-bold">
-                    {items.length}
-                  </p>
-
-                  <p className="text-[9px] text-white/25">
-                    Product types
-                  </p>
-                </div>
-
-              </div>
-
+              <div className="h-80 rounded-[2rem] bg-white shadow-sm" />
             </div>
 
-            {/* 3D CART */}
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  /*
+   * EMPTY CART
+   */
+  if (items.length === 0) {
+    return (
+      <main className="relative min-h-screen overflow-hidden bg-[#f7f8fa] px-5 pb-24 pt-32 text-slate-900 md:px-8">
+
+        {/* 3D BACKGROUND */}
+        <FloatingOrb
+          className="left-[8%] top-[20%]"
+          size="h-28 w-28"
+          delay={0}
+        />
+
+        <FloatingOrb
+          className="right-[10%] top-[25%]"
+          size="h-20 w-20"
+          delay={1.2}
+        />
+
+        <FloatingCube
+          className="right-[18%] bottom-[20%]"
+          delay={0.8}
+        />
+
+        <div className="relative z-10 mx-auto flex min-h-[70vh] max-w-xl flex-col items-center justify-center text-center">
+
+          {/* FLOATING BAG */}
+          <motion.div
+            initial={{
+              opacity: 0,
+              scale: 0.6,
+              rotateY: -25,
+            }}
+            animate={{
+              opacity: 1,
+              scale: 1,
+              rotateY: 0,
+              y: [0, -14, 0],
+            }}
+            transition={{
+              duration: 0.8,
+              y: {
+                duration: 4,
+                repeat: Infinity,
+                ease: "easeInOut",
+              },
+            }}
+            whileHover={{
+              rotateY: 15,
+              rotateX: -8,
+              scale: 1.06,
+            }}
+            className="relative mb-9 flex h-36 w-36 items-center justify-center rounded-[2.5rem] border border-white bg-white shadow-[0_35px_90px_rgba(15,23,42,0.14)]"
+            style={{
+              transformStyle: "preserve-3d",
+            }}
+          >
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{
+                duration: 15,
+                repeat: Infinity,
+                ease: "linear",
+              }}
+              className="absolute inset-[-18px] rounded-full border border-dashed border-slate-200"
+            />
+
+            <ShoppingBag
+              size={55}
+              strokeWidth={1.2}
+              className="text-slate-700"
+            />
 
             <motion.div
               animate={{
-                y: [0, -16, 0],
-                rotateY: [0, 12, -12, 0],
+                scale: [1, 1.25, 1],
+                opacity: [0.3, 0.6, 0.3],
               }}
               transition={{
-                duration: 5,
+                duration: 3,
                 repeat: Infinity,
               }}
-              className="mx-auto flex h-52 w-52 items-center justify-center rounded-[3.5rem] bg-white text-black shadow-[0_30px_100px_rgba(255,255,255,.12)]"
-              style={{
-                transformStyle: "preserve-3d",
+              className="absolute inset-5 -z-10 rounded-full bg-slate-300 blur-2xl"
+            />
+          </motion.div>
+
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
+            <Sparkles size={13} />
+            Vendora Marketplace
+          </div>
+
+          <h1 className="mt-4 text-4xl font-bold tracking-tight md:text-5xl">
+            Your cart is empty.
+          </h1>
+
+          <p className="mt-4 max-w-md text-sm leading-7 text-slate-500">
+            Discover something you love and bring it
+            into your Vendora cart.
+          </p>
+
+          <Link
+            href="/products"
+            className="group mt-8 flex items-center gap-3 rounded-2xl bg-slate-950 px-7 py-4 text-sm font-semibold text-white shadow-xl transition hover:-translate-y-1 hover:shadow-2xl"
+          >
+            Explore products
+
+            <motion.span
+              animate={{ x: [0, 4, 0] }}
+              transition={{
+                duration: 1.5,
+                repeat: Infinity,
               }}
             >
-              <ShoppingBag
-                size={92}
-                strokeWidth={1}
-              />
+              <ArrowRight size={16} />
+            </motion.span>
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
+  /*
+   * CART
+   */
+  return (
+    <main className="relative min-h-screen overflow-hidden bg-[#f7f8fa] px-5 pb-28 pt-32 text-slate-900 md:px-8">
+
+      {/* AMBIENT 3D OBJECTS */}
+      <FloatingOrb
+        className="left-[2%] top-[15%]"
+        size="h-20 w-20"
+        delay={0}
+      />
+
+      <FloatingOrb
+        className="right-[4%] top-[20%]"
+        size="h-28 w-28"
+        delay={1.2}
+      />
+
+      <FloatingCube
+        className="right-[6%] bottom-[15%]"
+        delay={0.5}
+      />
+
+      <div className="relative z-10 mx-auto max-w-7xl">
+
+        {/* HEADER */}
+        <motion.section
+          initial={{ opacity: 0, y: 25 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-10"
+        >
+          <Link
+            href="/products"
+            className="mb-6 inline-flex items-center gap-2 text-xs font-medium text-slate-400 transition hover:text-slate-900"
+          >
+            <ArrowLeft size={14} />
+            Continue shopping
+          </Link>
+
+          <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
+
+            <div>
+
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
+                <Sparkles size={13} />
+                Vendora Marketplace
+              </div>
+
+              <h1 className="mt-3 text-4xl font-bold tracking-tight md:text-6xl">
+                Your cart
+              </h1>
+
+              <p className="mt-3 text-sm text-slate-500">
+                {items.length}{" "}
+                {items.length === 1 ? "item" : "items"}{" "}
+                ready for checkout.
+              </p>
+
+            </div>
+
+            {/* CART COUNT 3D */}
+            <motion.div
+              animate={{ y: [0, -5, 0] }}
+              transition={{
+                duration: 3,
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
+              className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white bg-white text-lg font-bold shadow-[0_15px_40px_rgba(15,23,42,0.08)]"
+            >
+              {items.length}
             </motion.div>
 
           </div>
-        </section>
+        </motion.section>
 
-        {/* ================================= */}
-        {/* FREE SHIPPING BAR */}
-        {/* ================================= */}
+        {/* CONTENT */}
+        <div className="grid gap-8 lg:grid-cols-[1fr_390px]">
 
-        <motion.div
-          initial={{
-            opacity: 0,
-            y: 15,
-          }}
-          animate={{
-            opacity: 1,
-            y: 0,
-          }}
-          className="mt-7 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.025] p-4"
-        >
-          <Truck
-            size={16}
-            className="text-white/40"
-          />
+          {/* ITEMS */}
+          <section className="space-y-4">
 
-          <div className="flex-1">
-            <div className="flex justify-between text-[9px]">
-              <span className="text-white/40">
-                {subtotal >= 2000
-                  ? "Free delivery unlocked"
-                  : "Add ₹2,000 for free delivery"}
-              </span>
+            <AnimatePresence mode="popLayout">
 
-              <span className="text-white/20">
-                ₹
-                {subtotal.toLocaleString(
-                  "en-IN",
-                )}
-              </span>
-            </div>
+              {items.map((item, index) => (
 
-            <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/10">
-              <motion.div
-                initial={{
-                  width: 0,
-                }}
-                animate={{
-                  width: `${Math.min(
-                    100,
-                    (subtotal / 2000) *
-                      100,
-                  )}%`,
-                }}
-                className="h-full bg-white"
-              />
-            </div>
-          </div>
+                <motion.article
+                  key={item.id}
+                  layout
+                  initial={{
+                    opacity: 0,
+                    y: 25,
+                    scale: 0.97,
+                  }}
+                  animate={{
+                    opacity: 1,
+                    y: 0,
+                    scale: 1,
+                  }}
+                  exit={{
+                    opacity: 0,
+                    x: -30,
+                    scale: 0.95,
+                  }}
+                  transition={{
+                    delay: index * 0.06,
+                  }}
+                  whileHover={{
+                    y: -4,
+                  }}
+                  className="group relative overflow-hidden rounded-[2rem] border border-white bg-white p-4 shadow-[0_12px_40px_rgba(15,23,42,0.05)]"
+                >
 
-          {subtotal >= 2000 && (
-            <Check size={15} />
-          )}
-        </motion.div>
+                  <div className="flex flex-col gap-5 sm:flex-row">
 
-        {/* ================================= */}
-        {/* MAIN CART */}
-        {/* ================================= */}
-
-        {items.length > 0 ? (
-          <div className="mt-10 grid gap-7 lg:grid-cols-[1fr_390px]">
-
-            {/* ITEMS */}
-
-            <section>
-
-              <div className="flex items-end justify-between">
-
-                <div>
-                  <p className="text-[9px] uppercase tracking-[0.3em] text-white/20">
-                    Selected products
-                  </p>
-
-                  <h2 className="mt-3 text-3xl font-bold">
-                    Shopping bag
-                  </h2>
-                </div>
-
-                <span className="text-[9px] text-white/20">
-                  {items.reduce(
-                    (sum, item) =>
-                      sum + item.quantity,
-                    0,
-                  )}{" "}
-                  items
-                </span>
-
-              </div>
-
-              <div className="mt-7 space-y-3">
-
-                <AnimatePresence>
-                  {items.map((item) => (
-                    <motion.article
-                      key={item.id}
-                      layout
-                      initial={{
-                        opacity: 0,
-                        x: -20,
-                      }}
-                      animate={{
-                        opacity: 1,
-                        x: 0,
-                      }}
-                      exit={{
-                        opacity: 0,
-                        x: 30,
-                        scale: 0.96,
-                      }}
-                      className="group rounded-[1.7rem] border border-white/10 bg-white/[0.025] p-4"
+                    {/* IMAGE */}
+                    <Link
+                      href={`/products/${item.product_id}`}
+                      className="relative shrink-0"
                     >
+                      <motion.div
+                        whileHover={{
+                          scale: 1.04,
+                          rotateY: 5,
+                        }}
+                        className="relative h-36 w-full overflow-hidden rounded-[1.5rem] bg-slate-100 sm:h-36 sm:w-36"
+                        style={{
+                          transformStyle: "preserve-3d",
+                        }}
+                      >
 
-                      <div className="flex gap-4">
+                        <img
+                          src={
+                            item.image_url ||
+                            FALLBACK_IMAGE
+                          }
+                          alt={item.product_name}
+                          className="h-full w-full object-contain p-5 mix-blend-multiply"
+                        />
 
-                        {/* PRODUCT */}
+                        <div className="absolute inset-0 bg-gradient-to-tr from-white/20 to-transparent" />
 
-                        <div className="relative flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white/[0.04]">
+                      </motion.div>
+                    </Link>
 
-                          <motion.div
+                    {/* DETAILS */}
+                    <div className="flex min-w-0 flex-1 flex-col justify-between py-1">
+
+                      <div>
+
+                        <div className="flex items-start justify-between gap-4">
+
+                          <div>
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+                              Vendora Product
+                            </p>
+
+                            <Link
+                              href={`/products/${item.product_id}`}
+                              className="mt-2 block"
+                            >
+                              <h2 className="line-clamp-2 text-lg font-bold transition hover:text-slate-500">
+                                {item.product_name}
+                              </h2>
+                            </Link>
+                          </div>
+
+                          {/* REMOVE */}
+                          <motion.button
+                            type="button"
                             whileHover={{
-                              scale: 1.15,
-                              rotateY: 15,
+                              scale: 1.08,
+                              rotate: 5,
                             }}
-                            className="flex h-16 w-16 items-center justify-center rounded-xl bg-white text-3xl shadow-xl"
-                            style={{
-                              transformStyle:
-                                "preserve-3d",
+                            whileTap={{
+                              scale: 0.9,
                             }}
+                            onClick={() =>
+                              removeItem(item.id)
+                            }
+                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-300 transition hover:bg-red-50 hover:text-red-500"
+                            aria-label="Remove item"
                           >
-                            {item.image}
-                          </motion.div>
-
-                          <div className="absolute inset-0 rounded-2xl border border-white/[0.05]" />
+                            <Trash2 size={16} />
+                          </motion.button>
 
                         </div>
 
-                        {/* DETAILS */}
+                        <p className="mt-3 text-xl font-bold">
+                          ₹
+                          {Number(
+                            item.price,
+                          ).toLocaleString("en-IN")}
+                        </p>
 
-                        <div className="min-w-0 flex-1">
+                      </div>
 
-                          <div className="flex justify-between gap-3">
+                      {/* BOTTOM */}
+                      <div className="mt-5 flex flex-wrap items-center justify-between gap-4">
 
-                            <div>
-                              <p className="text-[8px] uppercase tracking-[0.2em] text-white/20">
-                                {item.vendor}
-                              </p>
+                        {/* QUANTITY */}
+                        <div className="flex items-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
 
-                              <h3 className="mt-2 text-sm font-semibold">
-                                {item.name}
-                              </h3>
-                            </div>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              decreaseQuantity(item.id)
+                            }
+                            disabled={
+                              item.quantity <= 1
+                            }
+                            className="flex h-10 w-10 items-center justify-center text-slate-400 transition hover:bg-white hover:text-slate-900 disabled:opacity-30"
+                          >
+                            <Minus size={14} />
+                          </button>
 
-                            <button
-                              onClick={() =>
-                                removeItem(
-                                  item.id,
-                                )
-                              }
-                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/20 transition hover:bg-white/10 hover:text-red-300"
-                            >
-                              <Trash2
-                                size={13}
-                              />
-                            </button>
+                          <span className="w-10 text-center text-xs font-bold">
+                            {item.quantity}
+                          </span>
 
-                          </div>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              increaseQuantity(item.id)
+                            }
+                            disabled={
+                              !!item.stock &&
+                              item.quantity >=
+                                item.stock
+                            }
+                            className="flex h-10 w-10 items-center justify-center text-slate-400 transition hover:bg-white hover:text-slate-900 disabled:opacity-30"
+                          >
+                            <Plus size={14} />
+                          </button>
 
-                          <div className="mt-5 flex items-center justify-between">
+                        </div>
 
-                            {/* QUANTITY */}
+                        {/* ITEM TOTAL */}
+                        <div className="text-right">
 
-                            <div className="flex items-center gap-1 rounded-xl border border-white/10 p-1">
+                          <p className="text-[10px] uppercase tracking-wider text-slate-400">
+                            Item total
+                          </p>
 
-                              <button
-                                onClick={() =>
-                                  updateQuantity(
-                                    item.id,
-                                    -1,
-                                  )
-                                }
-                                className="flex h-7 w-7 items-center justify-center rounded-lg text-white/30 hover:bg-white/10 hover:text-white"
-                              >
-                                <Minus
-                                  size={11}
-                                />
-                              </button>
-
-                              <span className="w-7 text-center text-[10px]">
-                                {item.quantity}
-                              </span>
-
-                              <button
-                                onClick={() =>
-                                  updateQuantity(
-                                    item.id,
-                                    1,
-                                  )
-                                }
-                                className="flex h-7 w-7 items-center justify-center rounded-lg text-white/30 hover:bg-white/10 hover:text-white"
-                              >
-                                <Plus
-                                  size={11}
-                                />
-                              </button>
-
-                            </div>
-
-                            {/* PRICE */}
-
-                            <p className="text-sm font-bold">
-                              ₹
-                              {(
-                                item.price *
-                                item.quantity
-                              ).toLocaleString(
-                                "en-IN",
-                              )}
-                            </p>
-
-                          </div>
+                          <p className="mt-1 text-sm font-bold">
+                            ₹
+                            {(
+                              Number(item.price) *
+                              item.quantity
+                            ).toLocaleString("en-IN")}
+                          </p>
 
                         </div>
 
                       </div>
 
-                    </motion.article>
-                  ))}
-                </AnimatePresence>
+                    </div>
+                  </div>
+
+                  {/* ANTIGRAVITY LIGHT */}
+                  <motion.div
+                    animate={{
+                      x: ["-100%", "200%"],
+                    }}
+                    transition={{
+                      duration: 5,
+                      repeat: Infinity,
+                      repeatDelay: 4,
+                    }}
+                    className="pointer-events-none absolute bottom-0 left-0 h-px w-1/3 bg-slate-300 blur-sm"
+                  />
+
+                </motion.article>
+
+              ))}
+
+            </AnimatePresence>
+
+          </section>
+
+          {/* SUMMARY */}
+          <aside>
+
+            <motion.div
+              initial={{
+                opacity: 0,
+                x: 30,
+              }}
+              animate={{
+                opacity: 1,
+                x: 0,
+              }}
+              className="sticky top-28 overflow-hidden rounded-[2rem] border border-white bg-white p-6 shadow-[0_20px_70px_rgba(15,23,42,0.08)]"
+            >
+
+              {/* 3D HEADER */}
+              <div className="relative mb-7 overflow-hidden rounded-[1.5rem] bg-slate-950 p-5 text-white">
+
+                <motion.div
+                  animate={{
+                    rotate: 360,
+                  }}
+                  transition={{
+                    duration: 20,
+                    repeat: Infinity,
+                    ease: "linear",
+                  }}
+                  className="absolute -right-10 -top-16 h-40 w-40 rounded-full border border-white/10"
+                />
+
+                <motion.div
+                  animate={{
+                    y: [0, -8, 0],
+                  }}
+                  transition={{
+                    duration: 3,
+                    repeat: Infinity,
+                  }}
+                  className="relative z-10"
+                >
+                  <Package
+                    size={22}
+                    strokeWidth={1.5}
+                  />
+
+                  <p className="mt-4 text-xs text-white/40">
+                    Vendora checkout
+                  </p>
+
+                  <h2 className="mt-1 text-xl font-bold">
+                    Order summary
+                  </h2>
+                </motion.div>
 
               </div>
-            </section>
 
-            {/* ================================= */}
-            {/* SUMMARY */}
-            {/* ================================= */}
+              {/* PRICE */}
+              <div className="space-y-4">
 
-            <aside>
+                <SummaryRow
+                  label="Subtotal"
+                  value={`₹${subtotal.toLocaleString(
+                    "en-IN",
+                  )}`}
+                />
 
-              <div className="sticky top-28 rounded-[2rem] border border-white/10 bg-white/[0.025] p-6">
+                <SummaryRow
+                  label="Delivery"
+                  value={
+                    delivery === 0
+                      ? "FREE"
+                      : `₹${delivery.toLocaleString(
+                          "en-IN",
+                        )}`
+                  }
+                />
 
-                <p className="text-[9px] uppercase tracking-[0.3em] text-white/20">
-                  Order summary
-                </p>
+                <div className="h-px bg-slate-100" />
 
-                <h2 className="mt-3 text-2xl font-bold">
-                  Checkout
-                </h2>
+                <div className="flex items-end justify-between">
 
-                {/* COUPON */}
-
-                <div className="mt-7">
-
-                  <button
-                    onClick={() =>
-                      setCouponOpen(
-                        !couponOpen,
-                      )
-                    }
-                    className="flex w-full items-center justify-between rounded-xl border border-white/10 px-4 py-3 text-[10px] text-white/40"
-                  >
-                    <span className="flex items-center gap-2">
-                      <Tag size={12} />
-                      Have a coupon?
-                    </span>
-
-                    <ChevronDown
-                      size={13}
-                      className={
-                        couponOpen
-                          ? "rotate-180"
-                          : ""
-                      }
-                    />
-                  </button>
-
-                  <AnimatePresence>
-                    {couponOpen && (
-                      <motion.div
-                        initial={{
-                          height: 0,
-                          opacity: 0,
-                        }}
-                        animate={{
-                          height: "auto",
-                          opacity: 1,
-                        }}
-                        exit={{
-                          height: 0,
-                          opacity: 0,
-                        }}
-                        className="overflow-hidden"
-                      >
-                        <div className="flex gap-2 pt-3">
-
-                          <input
-                            value={coupon}
-                            onChange={(e) =>
-                              setCoupon(
-                                e.target.value,
-                              )
-                            }
-                            placeholder="VEN10"
-                            className="min-w-0 flex-1 rounded-xl border border-white/10 bg-transparent px-3 py-3 text-[10px] outline-none placeholder:text-white/15 focus:border-white/30"
-                          />
-
-                          <button
-                            onClick={() => {
-                              if (
-                                coupon.trim()
-                              ) {
-                                setCouponApplied(
-                                  true,
-                                );
-                              }
-                            }}
-                            className="rounded-xl bg-white px-4 text-[9px] font-bold text-black"
-                          >
-                            Apply
-                          </button>
-
-                        </div>
-
-                        {couponApplied && (
-                          <p className="mt-2 text-[9px] text-white/40">
-                            ✓ 10% discount applied
-                          </p>
-                        )}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                </div>
-
-                {/* PRICES */}
-
-                <div className="mt-7 space-y-4 border-t border-white/10 pt-6">
-
-                  <SummaryRow
-                    label="Subtotal"
-                    value={`₹${subtotal.toLocaleString(
-                      "en-IN",
-                    )}`}
-                  />
-
-                  <SummaryRow
-                    label="Delivery"
-                    value={
-                      delivery === 0
-                        ? "FREE"
-                        : `₹${delivery}`
-                    }
-                  />
-
-                  {discount > 0 && (
-                    <SummaryRow
-                      label="Discount"
-                      value={`-₹${discount.toLocaleString(
-                        "en-IN",
-                      )}`}
-                    />
-                  )}
-
-                </div>
-
-                <div className="mt-6 flex items-end justify-between border-t border-white/10 pt-6">
-
-                  <span className="text-xs text-white/40">
+                  <span className="text-sm font-semibold">
                     Total
                   </span>
 
-                  <span className="text-2xl font-black">
+                  <span className="text-2xl font-bold">
                     ₹
                     {total.toLocaleString(
                       "en-IN",
@@ -593,91 +724,119 @@ export default function CartPage() {
 
                 </div>
 
-                {/* CHECKOUT */}
+              </div>
 
-                <button className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-white py-4 text-[10px] font-bold text-black transition hover:scale-[1.02]">
-                  Proceed to checkout
-                  <ArrowRight size={13} />
-                </button>
+              {/* CHECKOUT */}
+              <Link
+                href="/checkout"
+                className="group mt-7 flex min-h-[56px] items-center justify-center gap-3 rounded-2xl bg-slate-950 px-6 text-sm font-semibold text-white shadow-lg transition hover:-translate-y-1 hover:shadow-xl"
+              >
+                Proceed to checkout
 
-                {/* TRUST */}
+                <motion.span
+                  animate={{
+                    x: [0, 4, 0],
+                  }}
+                  transition={{
+                    duration: 1.5,
+                    repeat: Infinity,
+                  }}
+                >
+                  <ArrowRight size={16} />
+                </motion.span>
+              </Link>
 
-                <div className="mt-5 grid grid-cols-2 gap-2">
+              {/* FEATURES */}
+              <div className="mt-6 space-y-3">
 
-                  <MiniTrust
-                    icon={ShieldCheck}
-                    text="Secure payment"
-                  />
+                <MiniFeature
+                  icon={Truck}
+                  title="Fast delivery"
+                  text="Reliable vendor shipping"
+                />
 
-                  <MiniTrust
-                    icon={Truck}
-                    text="Tracked delivery"
-                  />
+                <MiniFeature
+                  icon={ShieldCheck}
+                  title="Secure checkout"
+                  text="Protected marketplace purchase"
+                />
 
-                </div>
+                <MiniFeature
+                  icon={Check}
+                  title="Verified vendors"
+                  text="Shop with confidence"
+                />
 
               </div>
-            </aside>
 
-          </div>
-        ) : (
-          /* ================================= */
-          /* EMPTY CART */
-          /* ================================= */
+              {/* FREE DELIVERY MESSAGE */}
+              {subtotal < 20000 && (
+                <div className="mt-6 rounded-2xl bg-slate-50 p-4">
 
-          <motion.section
-            initial={{
-              opacity: 0,
-              scale: 0.97,
-            }}
-            animate={{
-              opacity: 1,
-              scale: 1,
-            }}
-            className="mt-10 flex min-h-[450px] flex-col items-center justify-center rounded-[2rem] border border-dashed border-white/10 bg-white/[0.02] text-center"
-          >
+                  <p className="text-xs font-semibold">
+                    You're ₹
+                    {(
+                      20000 - subtotal
+                    ).toLocaleString(
+                      "en-IN",
+                    )}{" "}
+                    away from free delivery.
+                  </p>
 
-            <motion.div
-              animate={{
-                y: [0, -10, 0],
-                rotate: [0, 3, -3, 0],
-              }}
-              transition={{
-                duration: 3,
-                repeat: Infinity,
-              }}
-              className="flex h-24 w-24 items-center justify-center rounded-[2rem] border border-white/10 bg-white/[0.03]"
-            >
-              <ShoppingBag
-                size={38}
-                strokeWidth={1}
-                className="text-white/25"
-              />
+                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-200">
+
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{
+                        width: `${Math.min(
+                          100,
+                          (subtotal /
+                            20000) *
+                            100,
+                        )}%`,
+                      }}
+                      transition={{
+                        duration: 1,
+                      }}
+                      className="h-full rounded-full bg-slate-950"
+                    />
+
+                  </div>
+
+                </div>
+              )}
+
+              {subtotal >= 20000 && (
+                <motion.div
+                  initial={{
+                    opacity: 0,
+                    scale: 0.95,
+                  }}
+                  animate={{
+                    opacity: 1,
+                    scale: 1,
+                  }}
+                  className="mt-6 flex items-center gap-2 rounded-2xl bg-slate-50 p-4 text-xs font-semibold"
+                >
+                  <Check size={15} />
+                  You've unlocked free delivery.
+                </motion.div>
+              )}
+
             </motion.div>
 
-            <h2 className="mt-7 text-xl font-bold">
-              Your cart is empty
-            </h2>
+          </aside>
 
-            <p className="mt-3 max-w-sm text-xs leading-6 text-white/25">
-              Looks like you haven't added
-              anything yet. Let's find something
-              you'll love.
-            </p>
-
-            <button className="mt-7 flex items-center gap-2 rounded-xl bg-white px-6 py-3 text-[10px] font-bold text-black">
-              Continue shopping
-              <ArrowRight size={13} />
-            </button>
-
-          </motion.section>
-        )}
+        </div>
 
       </div>
     </main>
   );
 }
 
+/*
+ * SUMMARY ROW
+ */
 function SummaryRow({
   label,
   value,
@@ -686,35 +845,117 @@ function SummaryRow({
   value: string;
 }) {
   return (
-    <div className="flex justify-between text-[10px]">
-      <span className="text-white/25">
+    <div className="flex items-center justify-between text-sm">
+      <span className="text-slate-500">
         {label}
       </span>
 
-      <span className="text-white/60">
+      <span className="font-semibold">
         {value}
       </span>
     </div>
   );
 }
 
-function MiniTrust({
+/*
+ * SMALL FEATURE
+ */
+function MiniFeature({
   icon: Icon,
+  title,
   text,
 }: {
-  icon: typeof ShieldCheck;
+  icon: typeof Truck;
+  title: string;
   text: string;
 }) {
   return (
-    <div className="flex items-center gap-2 rounded-xl border border-white/10 p-3">
-      <Icon
-        size={12}
-        className="text-white/30"
-      />
+    <motion.div
+      whileHover={{ x: 3 }}
+      className="flex items-center gap-3"
+    >
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-50">
+        <Icon
+          size={15}
+          strokeWidth={1.6}
+        />
+      </div>
 
-      <span className="text-[8px] text-white/25">
-        {text}
-      </span>
-    </div>
+      <div>
+        <p className="text-[11px] font-semibold">
+          {title}
+        </p>
+
+        <p className="mt-0.5 text-[10px] text-slate-400">
+          {text}
+        </p>
+      </div>
+    </motion.div>
+  );
+}
+
+/*
+ * FLOATING 3D ORB
+ */
+function FloatingOrb({
+  className,
+  size,
+  delay,
+}: {
+  className: string;
+  size: string;
+  delay: number;
+}) {
+  return (
+    <motion.div
+      animate={{
+        y: [0, -22, 0],
+        x: [0, 8, 0],
+        rotate: [0, 8, 0],
+      }}
+      transition={{
+        duration: 6,
+        delay,
+        repeat: Infinity,
+        ease: "easeInOut",
+      }}
+      className={`pointer-events-none absolute ${className} ${size} rounded-full border border-white bg-gradient-to-br from-white via-slate-100 to-slate-200 opacity-70 shadow-[0_30px_80px_rgba(15,23,42,0.12)]`}
+    >
+      <div className="absolute left-1/4 top-1/4 h-1/3 w-1/3 rounded-full bg-white blur-md" />
+    </motion.div>
+  );
+}
+
+/*
+ * FLOATING 3D CUBE
+ */
+function FloatingCube({
+  className,
+  delay,
+}: {
+  className: string;
+  delay: number;
+}) {
+  return (
+    <motion.div
+      animate={{
+        y: [0, -18, 0],
+        rotateX: [0, 12, 0],
+        rotateY: [0, 20, 0],
+        rotateZ: [0, 5, 0],
+      }}
+      transition={{
+        duration: 7,
+        delay,
+        repeat: Infinity,
+        ease: "easeInOut",
+      }}
+      className={`pointer-events-none absolute ${className} h-14 w-14 rounded-2xl border border-white bg-white shadow-[0_25px_60px_rgba(15,23,42,0.1)]`}
+      style={{
+        transformStyle: "preserve-3d",
+      }}
+    >
+      <div className="absolute inset-2 rounded-xl bg-slate-100" />
+    </motion.div>
   );
 }
