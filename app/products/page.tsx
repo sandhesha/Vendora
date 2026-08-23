@@ -304,29 +304,29 @@ export default function ProductsPage() {
   };
 
   return (
-    <main className="min-h-screen bg-white text-gray-900">
+    <main className="min-h-screen bg-slate-950 text-white">
 
       {/* HEADER */}
-      <section className="border-b border-gray-200 bg-gray-50">
+      <section className="border-b border-white/10 bg-slate-950">
         <div className="mx-auto max-w-7xl px-6 py-12">
           <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
 
             <div>
-              <p className="mb-2 text-sm font-medium text-gray-500">
+              <p className="mb-2 text-sm font-medium text-white/50">
                 Vendora Marketplace
               </p>
 
-              <h1 className="text-4xl font-bold tracking-tight">
+              <h1 className="text-4xl font-bold tracking-tight text-white">
                 Products
               </h1>
 
-              <p className="mt-3 max-w-2xl text-gray-600">
+              <p className="mt-3 max-w-2xl text-black/60">
                 Discover products from independent
                 vendors across our marketplace.
               </p>
             </div>
 
-            <div className="text-sm text-gray-500">
+            <div className="text-sm text-white/50">
               {loading
                 ? "Loading products..."
                 : `${filteredProducts.length} products`}
@@ -342,7 +342,7 @@ export default function ProductsPage() {
 
           <Search
             size={20}
-            className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
+            className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40"
           />
 
           <input
@@ -352,14 +352,14 @@ export default function ProductsPage() {
               setSearch(event.target.value)
             }
             placeholder="Search products..."
-            className="w-full rounded-xl border border-gray-200 bg-white py-4 pl-12 pr-12 outline-none transition focus:border-gray-400"
+            className="w-full rounded-xl border border-[#E5E7EB] bg-white py-4 pl-12 pr-12 text-[#111827] outline-none transition focus:border-[#111827] focus:ring-2 focus:ring-[#111827]/10"
           />
 
           {search && (
             <button
               type="button"
               onClick={() => setSearch("")}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-900"
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 hover:text-white"
               aria-label="Clear search"
             >
               <X size={18} />
@@ -370,139 +370,136 @@ export default function ProductsPage() {
       </section>
 
       {/* MOBILE FILTER BUTTON */}
-      <section className="mx-auto max-w-7xl px-6 pt-6 md:hidden">
-        <button
-          type="button"
-          onClick={() =>
-            setMobileFilters(true)
-          }
-          className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 py-3 font-medium"
-        >
-          <SlidersHorizontal size={18} />
-          Filters
-        </button>
-      </section>
+      <section className="mx-auto max-w-7xl px-4 pt-6 md:hidden">
+  <button
+    type="button"
+    onClick={() => setMobileFilters(true)}
+    className="flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] py-3.5 text-sm font-medium text-white transition hover:border-white/20 hover:bg-white/[0.07]"
+  >
+    <SlidersHorizontal
+      size={18}
+      className="text-gray/500"
+    />
+    Filters
+  </button>
+</section>
 
       {/* MAIN CONTENT */}
       <section className="mx-auto flex max-w-7xl gap-8 px-6 py-8">
 
         {/* DESKTOP FILTERS */}
-        <aside className="hidden w-64 shrink-0 md:block">
+        <aside className="sticky top-24 hidden w-64 shrink-0 rounded-2xl border border-[#E5E7EB] bg-white p-5 shadow-sm md:block">
 
-          <div className="sticky top-24 rounded-2xl border border-gray-200 bg-white p-5">
+          {/* FILTER HEADER */}
+          <div className="sticky top-24 rounded-3xl border border-white/10 bg-white/[0.04] p-5">
 
-            {/* FILTER HEADER */}
-            <div className="mb-6 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Filter size={18} />
 
-              <div className="flex items-center gap-2">
-                <Filter size={18} />
+              <h2 className="font-semibold">
+                Filters
+              </h2>
+            </div>
 
-                <h2 className="font-semibold">
-                  Filters
-                </h2>
-              </div>
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="text-xs text-gray-500 hover:text-black"
+            >
+              Reset
+            </button>
 
-              <button
-                type="button"
-                onClick={resetFilters}
-                className="text-xs text-gray-500 hover:text-black"
-              >
-                Reset
-              </button>
+          </div>
+
+          {/* CATEGORY */}
+          <div className="mb-7">
+
+            <h3 className="mb-3 text-sm font-semibold">
+              Category
+            </h3>
+
+            <div className="space-y-2">
+
+              {categoryNames.map((cat) => (
+                <button
+                  type="button"
+                  key={cat}
+                  onClick={() =>
+                    setCategory(cat)
+                  }
+                  className={`block w-full rounded-lg px-3 py-2 text-left text-sm transition ${category === cat
+                    ? "bg-[#111827] text-white shadow-sm"
+                    : "text-[#6B7280] hover:bg-[#F1F5F9] hover:text-[#111827]"
+                    }`}
+                >
+                  {cat}
+                </button>
+              ))}
 
             </div>
 
-            {/* CATEGORY */}
-            <div className="mb-7">
+          </div>
 
-              <h3 className="mb-3 text-sm font-semibold">
-                Category
-              </h3>
+          {/* PRICE */}
+          <div className="mb-7">
 
-              <div className="space-y-2">
+            <h3 className="mb-3 text-sm text-black/90 font-bold">
+              Maximum Price
+            </h3>
 
-                {categoryNames.map((cat) => (
+            <div className="mb-3 text-sm text-black/60">
+              ₹{maxPrice.toLocaleString("en-IN")}
+            </div>
+
+            <input
+              type="range"
+              min="0"
+              max="50000"
+              step="500"
+              value={maxPrice}
+              onChange={(event) =>
+                setMaxPrice(
+                  Number(event.target.value),
+                )
+              }
+              className="w-full"
+            />
+
+          </div>
+
+          {/* RATING */}
+          <div>
+
+            <h3 className="mb-3 text-black/90 text-bold font-semibold">
+              Minimum Rating
+            </h3>
+
+            <div className="space-y-2 bg-gray/10">
+
+              {[0, 3, 4, 4.5].map(
+                (rating) => (
                   <button
                     type="button"
-                    key={cat}
+                    key={rating}
                     onClick={() =>
-                      setCategory(cat)
+                      setMinRating(rating)
                     }
-                    className={`block w-full rounded-lg px-3 py-2 text-left text-sm transition ${category === cat
-                        ? "bg-black text-white"
-                        : "text-gray-600 hover:bg-gray-100"
+                    className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-black/60 text-sm ${minRating === rating
+                      ? "bg-gray-100 font-medium"
+                      : "text-gray-600 hover:bg-gray-50"
                       }`}
                   >
-                    {cat}
+                    <Star
+                      size={15}
+                      fill="yellow"
+                    />
+
+                    {rating === 0
+                      ? "All ratings"
+                      : `${rating}+`}
                   </button>
-                ))}
-
-              </div>
-
-            </div>
-
-            {/* PRICE */}
-            <div className="mb-7">
-
-              <h3 className="mb-3 text-sm font-semibold">
-                Maximum Price
-              </h3>
-
-              <div className="mb-3 text-sm text-gray-600">
-                ₹{maxPrice.toLocaleString("en-IN")}
-              </div>
-
-              <input
-                type="range"
-                min="0"
-                max="50000"
-                step="500"
-                value={maxPrice}
-                onChange={(event) =>
-                  setMaxPrice(
-                    Number(event.target.value),
-                  )
-                }
-                className="w-full"
-              />
-
-            </div>
-
-            {/* RATING */}
-            <div>
-
-              <h3 className="mb-3 text-sm font-semibold">
-                Minimum Rating
-              </h3>
-
-              <div className="space-y-2">
-
-                {[0, 3, 4, 4.5].map(
-                  (rating) => (
-                    <button
-                      type="button"
-                      key={rating}
-                      onClick={() =>
-                        setMinRating(rating)
-                      }
-                      className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm ${minRating === rating
-                          ? "bg-gray-100 font-medium"
-                          : "text-gray-600 hover:bg-gray-50"
-                        }`}
-                    >
-                      <Star
-                        size={15}
-                        fill="currentColor"
-                      />
-
-                      {rating === 0
-                        ? "All ratings"
-                        : `${rating}+`}
-                    </button>
-                  ),
-                )}
-
-              </div>
+                ),
+              )}
 
             </div>
 
@@ -516,7 +513,7 @@ export default function ProductsPage() {
           {/* TOP BAR */}
           <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
 
-            <div className="text-sm text-gray-500">
+            <div className="text-sm text-black/50">
               {loading
                 ? "Loading..."
                 : `${filteredProducts.length} products found`}
@@ -529,28 +526,37 @@ export default function ProductsPage() {
                 onChange={(event) =>
                   setSort(event.target.value)
                 }
-                className="appearance-none rounded-xl border border-gray-200 bg-white py-3 pl-4 pr-10 text-sm outline-none"
+                className="appearance-none rounded-xl border border-gray-200 bg-gray py-3 pl-4 pr-10 text-sm outline-none"
               >
-                <option value="featured">
-                  Featured
-                </option>
+                <option
+    value="featured"
+    className="bg-slate-950 text-white"
+  >
+    Featured
+  </option>
 
-                <option value="price-low">
-                  Price: Low to High
-                </option>
+  <option
+    value="price-low"
+    className="bg-slate-950 text-white"
+  >
+    Price: Low to High
+  </option>
 
-                <option value="price-high">
-                  Price: High to Low
-                </option>
+  <option
+    value="price-high"
+    className="bg-slate-950 text-white"
+  >
+    Price: High to Low
+  </option>
 
-                <option value="rating">
-                  Highest Rated
-                </option>
+  <option
+    value="rating"
+    className="bg-slate-950 text-white"
+  >
+    Highest Rated
+  </option>
 
-                <option value="name">
-                  Name
-                </option>
-              </select>
+</select>
 
               <ChevronDown
                 size={16}
@@ -645,12 +651,11 @@ export default function ProductsPage() {
                         transition={{
                           delay: index * 0.03,
                         }}
-                        className="group overflow-hidden rounded-2xl border border-gray-200 bg-white transition hover:-translate-y-1 hover:shadow-lg"
+                        className="group overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] transition duration-300 hover:-translate-y-1 hover:border-white/20 hover:bg-white/[0.07]"
                       >
 
                         {/* IMAGE */}
-                        <div className="relative aspect-square overflow-hidden bg-gray-100">
-
+                        <div className="relative aspect-square overflow-hidden bg-white/[0.06]">
                           <Link
                             href={`/products/${product.id}`}
                             className="block h-full w-full"
@@ -673,7 +678,7 @@ export default function ProductsPage() {
                                 product.id,
                               )
                             }
-                            className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 shadow-sm backdrop-blur transition hover:bg-white"
+                            className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-slate-950/70 text-white shadow-sm backdrop-blur transition hover:bg-white hover:text-black"
                             aria-label={
                               isWishlisted
                                 ? "Remove from wishlist"
@@ -691,7 +696,7 @@ export default function ProductsPage() {
                           </button>
 
                           {/* CATEGORY */}
-                          <span className="absolute bottom-3 left-3 rounded-full bg-white/90 px-3 py-1 text-xs font-medium backdrop-blur">
+                          <span className="absolute bottom-3 left-3 rounded-full bg-gray px-3 py-1 text-xs font-medium text-black backdrop-blur">
                             {product.category}
                           </span>
 
@@ -725,7 +730,7 @@ export default function ProductsPage() {
 
                           </div>
 
-                          <div className="mt-4 flex items-center justify-between gap-3">
+                          <div className="flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm font-medium text-white transition hover:bg-white/10">
 
                             <span className="text-xl font-bold">
                               ₹
@@ -741,7 +746,7 @@ export default function ProductsPage() {
 
                             <Link
                               href={`/products/${product.id}`}
-                              className="flex items-center justify-center rounded-lg border border-gray-200 px-3 py-2.5 text-sm font-medium transition hover:bg-gray-50"
+                              className="flex items-center justify-center gap-2 rounded-xl bg-white px-3 py-2.5 text-sm font-medium text-black transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-40"
                             >
                               View
                             </Link>
@@ -757,7 +762,7 @@ export default function ProductsPage() {
                                   product,
                                 )
                               }
-                              className="flex items-center justify-center gap-2 rounded-lg bg-black px-3 py-2.5 text-sm font-medium text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-40"
+                              className="flex items-center justify-center gap-2 rounded-lg bg-[#111827] px-3 py-2.5 text-sm font-medium text-white transition hover:bg-[#1F2937] disabled:cursor-not-allowed disabled:opacity-40"
                             >
 
                               {isAdding ? (
@@ -793,18 +798,18 @@ export default function ProductsPage() {
           {!loading &&
             !error &&
             filteredProducts.length === 0 && (
-              <div className="rounded-2xl border border-dashed border-gray-300 py-20 text-center">
+              <div className="rounded-3xl border border-dashed border-white/10 bg-white/[0.03] py-20 text-center">
 
                 <Search
                   size={40}
-                  className="mx-auto mb-4 text-gray-300"
+                  className="mx-auto mb-4 text-white/20"
                 />
 
                 <h2 className="text-xl font-semibold">
                   No products found
                 </h2>
 
-                <p className="mt-2 text-sm text-gray-500">
+                <p className="mt-2 text-sm text-white/50">
                   Try changing your search or
                   filters.
                 </p>
@@ -812,7 +817,7 @@ export default function ProductsPage() {
                 <button
                   type="button"
                   onClick={resetFilters}
-                  className="mt-5 rounded-lg bg-black px-5 py-3 text-sm font-medium text-white"
+                  className="mt-5 rounded-xl bg-white px-5 py-3 text-black/60 text-sm font-medium text-black/60 transition hover:bg-white/90"
                 >
                   Reset filters
                 </button>
@@ -847,13 +852,13 @@ export default function ProductsPage() {
                 type: "spring",
                 damping: 25,
               }}
-              className="fixed right-0 top-0 z-50 h-full w-[85%] max-w-sm overflow-y-auto bg-white p-6 md:hidden"
+              className="fixed right-0 top-0 z-50 h-full w-[85%] max-w-sm overflow-y-auto bg-[#F8FAFC] p-6 md:hidden"
             >
 
               {/* HEADER */}
               <div className="mb-8 flex items-center justify-between">
 
-                <h2 className="text-xl font-bold">
+                <h2 className="text-xl text-black/60 font-bold">
                   Filters
                 </h2>
 
@@ -871,13 +876,13 @@ export default function ProductsPage() {
               </div>
 
               {/* CATEGORY */}
-              <div className="mb-8">
+              <div className="mb-8 text-black/60">
 
-                <h3 className="mb-3 font-semibold">
+                <h3 className="mb-3 text-black/60 font-semibold">
                   Category
                 </h3>
 
-                <div className="space-y-2">
+                <div className="space-y-2 ">
 
                   {categoryNames.map((cat) => (
                     <button
@@ -888,8 +893,8 @@ export default function ProductsPage() {
                         setMobileFilters(false);
                       }}
                       className={`block w-full rounded-lg px-3 py-3 text-left text-sm ${category === cat
-                          ? "bg-black text-white"
-                          : "bg-gray-50 hover:bg-gray-100"
+                        ? "bg-white text-black"
+                        : "text-white/60 hover:bg-white/[0.07] hover:text-white"
                         }`}
                     >
                       {cat}
@@ -945,9 +950,9 @@ export default function ProductsPage() {
                           setMinRating(rating);
                           setMobileFilters(false);
                         }}
-                        className={`flex w-full items-center gap-2 rounded-lg px-3 py-3 text-sm ${minRating === rating
-                            ? "bg-gray-100 font-medium"
-                            : "hover:bg-gray-50"
+                        className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm transition ${minRating === rating
+                          ? "bg-white/10 font-medium text-wtext-black/60"
+                          : "text-blackb/60 hover:bg-white/[0.06] hover:text-white"
                           }`}
                       >
                         <Star
@@ -973,7 +978,7 @@ export default function ProductsPage() {
                   resetFilters();
                   setMobileFilters(false);
                 }}
-                className="mt-10 w-full rounded-xl bg-black py-3 font-medium text-white transition hover:bg-gray-800"
+                className="mt-10 w-full rounded-xl bg-black py-3 font-medium text-black transition hover:bg-gray-800"
               >
                 Reset Filters
               </button>
@@ -983,6 +988,6 @@ export default function ProductsPage() {
         )}
       </AnimatePresence>
 
-    </main>
+    </main >
   );
 }

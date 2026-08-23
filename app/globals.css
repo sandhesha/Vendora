@@ -227,3 +227,70 @@ html {
 .detective-walk {
   animation: detectiveWalk 8s ease-in-out infinite;
 }
+
+@layer utilities {
+  /* 3D Perspective Container */
+  .perspective-container {
+    perspective: 1000px;
+  }
+  
+  /* 3D Card Depth Effect */
+  .card-3d {
+    transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.4s ease;
+    transform-style: preserve-3d;
+  }
+  .card-3d:hover {
+    transform: translateY(-8px) rotateX(4deg) rotateY(-4deg);
+    box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.3), 0 0 20px rgba(99, 102, 241, 0.2);
+  }
+
+  /* Professional Glassmorphism */
+  .glass-card {
+    background: rgba(18, 18, 24, 0.75);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+}
+
+
+:root {
+  --background: #09090b;
+  --foreground: #fafafa;
+  --primary: #6366f1; /* Electric Indigo */
+  --accent: #a855f7;   /* Vibrant Purple */
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), sans-serif;
+  overflow-x: hidden;
+}
+
+
+/* =========================================================
+   VENDORA GLOBAL DESIGN COLORS
+   ========================================================= */
+
+:root {
+  --vendora-bg: #f5f7fa;
+  --vendora-surface: #ffffff;
+  --vendora-surface-soft: #f8fafc;
+
+  --vendora-primary: #0f172a;
+  --vendora-primary-hover: #1e293b;
+
+  --vendora-text: #0f172a;
+  --vendora-text-secondary: #64748b;
+  --vendora-text-muted: #94a3b8;
+
+  --vendora-border: #e2e8f0;
+  --vendora-border-strong: #cbd5e1;
+
+  --vendora-accent: #6366f1;
+
+  --vendora-success: #10b981;
+  --vendora-warning: #f59e0b;
+  --vendora-error: #ef4444;
+}

@@ -69,12 +69,22 @@ export function AuthProvider({
   }, []);
 
   function login(newUser: User, newToken: string) {
-    localStorage.setItem(TOKEN_KEY, newToken);
-    localStorage.setItem(USER_KEY, JSON.stringify(newUser));
+  console.log("[AUTH] login() called");
+  console.log("[AUTH] user:", newUser);
+  console.log("[AUTH] token received:", Boolean(newToken));
+  console.log("[AUTH] token length:", newToken?.length);
 
-    setToken(newToken);
-    setUser(newUser);
-  }
+  localStorage.setItem(TOKEN_KEY, newToken);
+  localStorage.setItem(USER_KEY, JSON.stringify(newUser));
+
+  console.log(
+    "[AUTH] token stored:",
+    Boolean(localStorage.getItem(TOKEN_KEY)),
+  );
+
+  setToken(newToken);
+  setUser(newUser);
+}
 
   async function refreshUser() {
     const currentToken =

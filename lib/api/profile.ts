@@ -1,5 +1,10 @@
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+// lib/api/profile.ts
+
+import { api } from "./api-client";
+
+/* =========================================================
+   TYPES
+   ========================================================= */
 
 export interface UserProfile {
   id: number;
@@ -33,121 +38,171 @@ export interface AddressCreate {
   is_default?: boolean;
 }
 
-function getToken(): string | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  return localStorage.getItem("access_token");
+export interface AddressUpdate {
+  full_name?: string;
+  phone?: string;
+  address_line?: string;
+  city?: string;
+  state?: string;
+  postal_code?: string;
+  country?: string;
+  is_default?: boolean;
 }
 
-function authHeaders(): HeadersInit {
-  const token = getToken();
-
-  return {
-    "Content-Type": "application/json",
-    ...(token
-      ? {
-          Authorization: `Bearer ${token}`,
-        }
-      : {}),
-  };
-}
+/* =========================================================
+   GET MY PROFILE
+   ========================================================= */
 
 export async function getMyProfile(): Promise<UserProfile> {
-  const response = await fetch(`${API_URL}/users/me`, {
-    method: "GET",
-    headers: authHeaders(),
-  });
-
-  if (!response.ok) {
-    throw new Error("Failed to load profile");
-  }
-
-  return response.json();
+  return api.get<UserProfile>("/users/me");
 }
+
+/* =========================================================
+   UPDATE MY PROFILE
+   ========================================================= */
 
 export async function updateMyProfile(
-  data: { name?: string | null }
+  data: {
+    name?: string | null;
+  },
 ): Promise<UserProfile> {
-  const response = await fetch(`${API_URL}/users/me`, {
-    method: "PATCH",
-    headers: authHeaders(),
-    body: JSON.stringify(data),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(errorText || "Failed to update profile");
-  }
-
-  return response.json();
+  return api.patch<UserProfile>(
+    "/users/me",
+    data,
+  );
 }
+
+/* =========================================================
+   GET MY ADDRESSES
+   ========================================================= */
 
 export async function getMyAddresses(): Promise<Address[]> {
-  const response = await fetch(`${API_URL}/users/me/addresses`, {
-    method: "GET",
-    headers: authHeaders(),
-  });
+  const data = await api.get<Address[]>(
+    "/users/me/addresses",
+  );
 
-  if (!response.ok) {
-    throw new Error("Failed to load addresses");
+  if (!Array.isArray(data)) {
+    throw new Error(
+      "Invalid addresses response from server.",
+    );
   }
 
-  return response.json();
+  return data;
 }
+
+/* =========================================================
+   CREATE ADDRESS
+   ========================================================= */
 
 export async function createAddress(
-  data: AddressCreate
+  data: AddressCreate,
 ): Promise<Address> {
-  const response = await fetch(`${API_URL}/users/me/addresses`, {
-    method: "POST",
-    headers: authHeaders(),
-    body: JSON.stringify(data),
-  });
+  return api.post<Address>(
+    "/users/me/addresses",
+    {
+      full_name:
+        data.full_name.trim(),
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(errorText || "Failed to create address");
-  }
+      phone:
+        data.phone.trim(),
 
-  return response.json();
+      address_line:
+        data.address_line.trim(),
+
+      city:
+        data.city.trim(),
+
+      state:
+        data.state.trim(),
+
+      postal_code:
+        data.postal_code.trim(),
+
+      country:
+        data.country?.trim() || "India",
+
+      is_default:
+        data.is_default ?? false,
+    },
+  );
 }
+
+/* =========================================================
+   UPDATE ADDRESS
+   ========================================================= */
 
 export async function updateAddress(
   addressId: number,
-  data: Partial<AddressCreate>
+  data: Partial<AddressCreate>,
 ): Promise<Address> {
-  const response = await fetch(
-    `${API_URL}/users/me/addresses/${addressId}`,
-    {
-      method: "PATCH",
-      headers: authHeaders(),
-      body: JSON.stringify(data),
-    }
-  );
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(errorText || "Failed to update address");
+  if (!addressId) {
+    throw new Error(
+      "Invalid address ID.",
+    );
   }
 
-  return response.json();
+  const cleanData: AddressUpdate = {};
+
+  if (data.full_name !== undefined) {
+    cleanData.full_name =
+      data.full_name.trim();
+  }
+
+  if (data.phone !== undefined) {
+    cleanData.phone =
+      data.phone.trim();
+  }
+
+  if (data.address_line !== undefined) {
+    cleanData.address_line =
+      data.address_line.trim();
+  }
+
+  if (data.city !== undefined) {
+    cleanData.city =
+      data.city.trim();
+  }
+
+  if (data.state !== undefined) {
+    cleanData.state =
+      data.state.trim();
+  }
+
+  if (data.postal_code !== undefined) {
+    cleanData.postal_code =
+      data.postal_code.trim();
+  }
+
+  if (data.country !== undefined) {
+    cleanData.country =
+      data.country.trim();
+  }
+
+  if (data.is_default !== undefined) {
+    cleanData.is_default =
+      data.is_default;
+  }
+
+  return api.patch<Address>(
+    `/users/me/addresses/${addressId}`,
+    cleanData,
+  );
 }
 
-export async function deleteAddress(
-  addressId: number
-): Promise<void> {
-  const response = await fetch(
-    `${API_URL}/users/me/addresses/${addressId}`,
-    {
-      method: "DELETE",
-      headers: authHeaders(),
-    }
-  );
+/* =========================================================
+   DELETE ADDRESS
+   ========================================================= */
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(errorText || "Failed to delete address");
+export async function deleteAddress(
+  addressId: number,
+): Promise<void> {
+  if (!addressId) {
+    throw new Error(
+      "Invalid address ID.",
+    );
   }
+
+  await api.delete<void>(
+    `/users/me/addresses/${addressId}`,
+  );
 }
