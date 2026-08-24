@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from jose import JWTError, jwt
 from backend.models.vendor import Vendor
 from sqlalchemy.orm import Session
+from backend.redis_client import redis_client
 from backend.core.security import (ALGORITHM,SECRET_KEY,create_access_token,hash_password,verify_password,)
 from backend.database import Base, SessionLocal, engine
 from backend.models.product_attribute import ProductAttribute
@@ -5247,4 +5248,20 @@ def create_audit_log(
     db.commit()
 
     return audit_log
+
+
+
+@app.get("/health/redis")
+def redis_health():
+    try:
+        redis_client.ping()
+        return {
+            "status": "ok",
+            "redis": "connected",
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "redis": str(e),
+        }
 
